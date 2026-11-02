@@ -2,20 +2,8 @@
 
 import { DEFAULT_CADENCE_DAYS, daysSince, driftRatio, lastNameKey } from './data.js';
 import { recencyColor, tagColor } from './graph.js';
-
-/**
- * escapeHtml(text) -> string
- *
- * Escape user-written text before it goes into `innerHTML`.
- *
- *   - `text` — any value; null and undefined become ''
- *
- * Returns HTML-safe text.
- */
-export function escapeHtml(text) {
-  return String(text ?? '').replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
+import { escapeHtml, formatDate } from './html.js';
+import { logListHtml } from './logs.js';
 
 /**
  * agoText(days) -> string
@@ -182,32 +170,36 @@ export function renderReachOut(el, picks, selectedId, onPick) {
 
 
 /**
- * showPerson(panel, person, people, links, tags, { onPick, onTag, onCadence, onEdit })
+ * showPerson(panel, person, { people, links, tags, logs }, { onPick, onTag, onCadence, onEdit, onLog, onEditLog })
  *
  * Slide the side panel open with one person's details, or slide it closed when `person` is null.
  *
  *   - `panel`  — the `<aside>` element
  *   - `person` — the selected person, or null
  *   - `people` — all people, used to name connections
- *   - `links`  — `{ source, target, label }` with person ids
+ *   - `links`  — every connection `{ source, target, label, kind }` (person ids), chat ones included
  *   - `tags`   — every tag in use, for chip colours
+ *   - `logs`   — all chat logs
  *   - `onPick` — called with a person id (or null to close) when a connection's name is clicked
  *   - `onTag`  — called with a tag name when one of their tags is clicked
  *   - `onCadence` — called with (person id, days) when their check-in cadence is changed
  *   - `onEdit` — called with the person id when the pencil button is clicked
+ *   - `onLog`  — called with the person id to start a new chat with them
+ *   - `onEditLog` — called with a chat id when its edit link is clicked
  */
-export function showPerson(panel, person, people, links, tags, { onPick, onTag, onCadence, onEdit }) {
+export function showPerson(panel, person, { people, links, tags, logs }, { onPick, onTag, onCadence, onEdit, onLog, onEditLog }) {
   if (!person) { panel.classList.remove('open'); return; }
   const byId = new Map(people.map((p) => [p.id, p]));
   const conns = links
     .filter((l) => l.source === person.id || l.target === person.id)
-    .map((l) => ({ other: byId.get(l.source === person.id ? l.target : l.source), label: l.label }));
+    .map((l) => ({ other: byId.get(l.source === person.id ? l.target : l.source), label: l.label, kind: l.kind }));
+  const chats = logListHtml(logs, person.id, people);
 
   const inner = panel.querySelector('.panel-inner');
   inner.innerHTML = `
     <button class="btn btn-ghost close" aria-label="Close">close</button>
     <h2>${escapeHtml(person.name)}</h2>
-    <div class="when">last talked ${agoText(daysSince(person.lastChat))}</div>
+    <div class="when">last talked ${agoText(daysSince(person.lastChat))}${person.lastChat ? ` · ${formatDate(person.lastChat)}` : ''}</div>
     <div class="when cadence-row">check in every
       <input class="cadence-num" type="number" min="1" step="1" inputmode="numeric" aria-label="Check-in every how many" />
       <select class="cadence-unit" aria-label="Check-in unit" title="a month counts as 30 days">
@@ -219,7 +211,12 @@ export function showPerson(panel, person, people, links, tags, { onPick, onTag, 
     ${person.notes ? `<h3>Notes</h3><p class="notes">${escapeHtml(person.notes)}</p>` : ''}
     <h3>Connected to</h3>
     <ul>${conns.map((c) => `<li><button class="linkish" data-id="${escapeHtml(c.other.id)}">${escapeHtml(c.other.name)}</button>
-      <span class="rel">· ${escapeHtml(c.label)}</span></li>`).join('') || '<li class="rel">no one yet</li>'}</ul>`;
+      <span class="rel">· ${escapeHtml(c.label)}</span></li>`).join('') || '<li class="rel">no one yet</li>'}</ul>
+    <h3>Chats <button class="mini log-new">+ log a chat</button></h3>
+    <ul class="log-list">${chats || '<li class="rel">no chats logged yet</li>'}</ul>`;
+  inner.querySelectorAll('.mention').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
+  inner.querySelectorAll('.log-edit').forEach((b) => b.addEventListener('click', () => onEditLog(b.dataset.log)));
+  inner.querySelector('.log-new').addEventListener('click', () => onLog(person.id));
   const editBtn = panel.querySelector('.edit-btn');
   editBtn.hidden = false;
   editBtn.setAttribute('aria-label', `Edit ${person.name}`);

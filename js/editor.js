@@ -1,7 +1,8 @@
 // Person editor: the form the side panel switches to when adding or editing someone.
 
-import { DEFAULT_CADENCE_DAYS, lastNameKey, todayISO } from './data.js';
-import { MAX_CADENCE_DAYS, escapeHtml, splitCadence } from './ui.js';
+import { DEFAULT_CADENCE_DAYS, todayISO } from './data.js';
+import { escapeHtml } from './html.js';
+import { MAX_CADENCE_DAYS, splitCadence } from './ui.js';
 
 /** Suggested labels for a connection between two people. */
 const LINK_LABELS = ['introduced by', 'met through', 'friends', 'family', 'roommates', 'coworkers', 'classmates'];
@@ -10,6 +11,7 @@ const LINK_LABELS = ['introduced by', 'met through', 'friends', 'family', 'roomm
  * renderEditor(inner, { person, people, links, tags }, { onSave, onCancel, onDelete })
  *
  * Fill the panel with an add/edit form. Nothing changes until Save; Cancel throws the draft away.
+ * A connection to a name nobody has yet is saved as `{ newName }` and becomes a new person.
  *
  *   - `inner`    — the panel content element
  *   - `person`   — the person to edit, or null to add someone new
@@ -28,8 +30,7 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
   const draftLinks = person
     ? links.filter((l) => l.source === person.id || l.target === person.id).map((l) => ({ ...l }))
     : [];
-  const others = people.filter((p) => !person || p.id !== person.id)
-    .sort((a, b) => lastNameKey(a.name).localeCompare(lastNameKey(b.name)));
+  const others = people.filter((p) => !person || p.id !== person.id);
   const nameOf = (id) => (people.find((p) => p.id === id) || { name: '?' }).name;
   const [cadN, cadU] = splitCadence(draft.cadenceDays);
 
@@ -71,10 +72,8 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
       <div class="field"><span>Connected to</span>
         <ul class="conn-list"></ul>
         <div class="inline conn-add">
-          <select class="conn-person" aria-label="Person to connect">
-            <option value="">someone…</option>
-            ${others.map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('')}
-          </select>
+          <input class="conn-person" list="conn-people" placeholder="someone's name…" autocomplete="off" aria-label="Person to connect" />
+          <datalist id="conn-people">${others.map((p) => `<option value="${escapeHtml(p.name)}"></option>`).join('')}</datalist>
           <input class="conn-label" list="link-labels" value="introduced by" aria-label="How they are connected" />
           <button type="button" class="btn conn-add-btn">add</button>
         </div>
@@ -122,7 +121,8 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
   function drawConns() {
     connList.innerHTML = draftLinks.map((l, i) => {
       const other = l.source === draft.id ? l.target : l.source;
-      return `<li>${escapeHtml(nameOf(other))} <span class="rel">· ${escapeHtml(l.label)}</span>`
+      const name = l.newName ? `${escapeHtml(l.newName)} <em class="rel">new</em>` : escapeHtml(nameOf(other));
+      return `<li>${name} <span class="rel">· ${escapeHtml(l.label)}</span>`
         + `<button type="button" class="mini" data-i="${i}">remove</button></li>`;
     }).join('') || '<li class="rel">no one yet</li>';
     connList.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
@@ -132,11 +132,14 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
   }
 
   inner.querySelector('.conn-add-btn').addEventListener('click', () => {
-    const otherId = inner.querySelector('.conn-person').value;
+    const typed = inner.querySelector('.conn-person').value.trim();
     const label = inner.querySelector('.conn-label').value.trim() || 'friends';
-    if (!otherId) return;
-    const dup = draftLinks.some((l) => l.source === otherId || l.target === otherId);
-    if (!dup) draftLinks.push({ source: draft.id, target: otherId, label });
+    if (!typed) return;
+    const known = others.find((p) => p.name.toLowerCase() === typed.toLowerCase());
+    const dup = known
+      ? draftLinks.some((l) => l.source === known.id || l.target === known.id)
+      : draftLinks.some((l) => l.newName && l.newName.toLowerCase() === typed.toLowerCase());
+    if (!dup) draftLinks.push(known ? { source: draft.id, target: known.id, label } : { source: draft.id, target: null, newName: typed, label });
     inner.querySelector('.conn-person').value = '';
     drawConns();
   });
@@ -169,7 +172,8 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
   const del = inner.querySelector('.delete');
   if (del) {
     del.addEventListener('click', () => {
-      if (window.confirm(`Delete ${person.name}? This removes them and their connections.`)) onDelete(person.id);
+      const msg = `Delete ${person.name}? This removes them, their connections, and any chat where they were the only one.`;
+      if (window.confirm(msg)) onDelete(person.id);
     });
   }
 

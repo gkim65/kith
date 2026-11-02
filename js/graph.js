@@ -128,7 +128,7 @@ function angularOrder(friends, edges) {
  *
  *   - `svgEl`       — the `<svg>` element to draw into
  *   - `people`      — person objects with `id`, `name`, `tags`, `lastChat`, `cadenceDays`
- *   - `links`       — `{ source, target, label }` with person ids
+ *   - `links`       — `{ source, target, label, kind }` with person ids; `kind: 'log'` draws dotted
  *   - `tags`        — every tag in use, from `tagList` (fixes nebula colours)
  *   - `meName`      — label for the center star (your first name), default 'you'
  *   - `onSelect`    — called with a person (or null) when a star or empty sky is clicked
@@ -146,6 +146,8 @@ export function renderConstellation(svgEl, people, links, tags, {
   obstruction = () => ({ right: 0, bottom: 0 }),
 } = {}) {
   const svg = d3.select(svgEl);
+  // Stop any camera glide from the previous drawing before its stars are removed.
+  svg.interrupt();
   svg.selectAll('*').remove();
   const { width, height } = svgEl.parentElement.getBoundingClientRect();
   const cx = width / 2;
@@ -155,7 +157,8 @@ export function renderConstellation(svgEl, people, links, tags, {
 
   const me = { id: 'me', name: meName || 'you', isMe: true, tags: [], x: cx, y: cy, fx: cx, fy: cy };
   const friends = people.map((p) => ({ ...p, ratio: driftRatio(p) }));
-  const nodes = [me, ...friends];
+  // An empty sky shows no rings and no center star until the first person arrives.
+  const nodes = friends.length ? [me, ...friends] : [];
   const byId = new Map(friends.map((f) => [f.id, f]));
   const edges = links.map((l) => ({ ...l, source: byId.get(l.source), target: byId.get(l.target) }));
   const neighbours = new Map(friends.map((n) => [n.id, new Set()]));
@@ -176,7 +179,7 @@ export function renderConstellation(svgEl, people, links, tags, {
   const world = svg.append('g');
 
   const rings = world.append('g');
-  [[1, 'due'], [2, 'overdue']].forEach(([ratio, label]) => {
+  (friends.length ? [[1, 'due'], [2, 'overdue']] : []).forEach(([ratio, label]) => {
     const r = orbitRadius(ratio, sky);
     rings.append('circle').attr('class', 'ring').attr('cx', cx).attr('cy', cy).attr('r', r);
     rings.append('text').attr('class', 'ring-label').attr('x', cx).attr('y', cy - r - 6)
@@ -184,7 +187,8 @@ export function renderConstellation(svgEl, people, links, tags, {
   });
 
   const nebula = world.append('g').attr('class', 'nebula').attr('filter', 'url(#nebula-blur)');
-  const linkSel = world.append('g').selectAll('line').data(edges).join('line').attr('class', 'link');
+  const linkSel = world.append('g').selectAll('line').data(edges).join('line')
+    .attr('class', (d) => (d.kind === 'log' ? 'link log' : 'link'));
   const nodeSel = world.append('g').selectAll('g').data(nodes, (d) => d.id).join('g')
     .attr('class', (d) => (d.isMe ? 'node me' : 'node'));
   nodeSel.append('circle').attr('class', 'halo').attr('r', (d) => (d.isMe ? 16 : STAR_R * 2.4));
@@ -226,6 +230,8 @@ export function renderConstellation(svgEl, people, links, tags, {
    * Priority: you, the selected person, their neighbours, lit tag or search matches, everyone else.
    */
   function declutter() {
+    // A late call from a drawing that has since been replaced has nothing left to measure.
+    if (nodeSel.empty() || !nodeSel.node().isConnected) return;
     const zoomed = svgEl.classList.contains('zoomed');
     const rank = (g) => (g.classList.contains('me') ? 0 : g.classList.contains('selected') ? 1
       : g.classList.contains('neighbour') ? 2 : g.classList.contains('tagged') ? 3 : zoomed ? 4 : null);

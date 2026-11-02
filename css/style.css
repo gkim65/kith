@@ -207,6 +207,8 @@ body {
 
 .link { stroke: var(--line); stroke-width: 1; transition: opacity 0.5s var(--ease); }
 .link.dim { opacity: 0.1; }
+.link.log { stroke-dasharray: 3 4; stroke-width: 1.2; opacity: 0.85; }
+.link.log.dim { opacity: 0.08; }
 
 .node { cursor: pointer; transition: opacity 0.5s var(--ease); }
 .node .halo { opacity: 0.2; transition: opacity 0.3s; }
@@ -334,7 +336,48 @@ body {
 
 /* ── Person editor ── */
 .editor h2 { margin-bottom: 14px; }
-.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.field { position: relative; display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.form-hint { color: var(--muted); font-size: 13px; line-height: 1.45; margin: -2px 0 0; }
+.edit-chip.new em, .conn-list em { font-style: normal; font-size: 11px; color: var(--muted); margin-left: 4px; }
+
+/* Suggestion dropdown under a name field or the chat note. */
+.suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.suggest[hidden] { display: none; }
+.suggest li { padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.suggest li.active, .suggest li:hover { background: var(--hover); }
+.suggest li.new { color: var(--muted); font-style: italic; }
+
+/* ── Chat list in the person panel ── */
+.log-list .log { padding: 10px 0; border-top: 1px solid var(--border); }
+.log-list .log:first-child { border-top: none; padding-top: 4px; }
+.log-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.log-date { font-weight: 600; }
+.log-head .mini { margin-left: auto; }
+.log-note { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.5; }
+.mention {
+  font: inherit;
+  color: var(--text);
+  background: var(--hover);
+  border: none;
+  border-radius: 6px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.mention:hover { background: var(--border); }
+.panel h3 .mini { font-family: var(--font-body); font-style: normal; }
 .field > span { font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 15px; color: var(--muted); }
 .field input, .field select, .field textarea, .conn-add input, .conn-add select, .name-dialog input {
   font: inherit;

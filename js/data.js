@@ -52,19 +52,20 @@ export function tagList(people) {
 }
 
 /**
- * matchesQuery(person, query) -> boolean
+ * matchesQuery(person, query, extra) -> boolean
  *
- * Case-insensitive search over a person's name, tags, how you met, and notes.
+ * Case-insensitive search over a person's name, tags, how you met, notes, and any extra text.
  *
  *   - `person` — person object
  *   - `query`  — search text; blank matches everyone
+ *   - `extra`  — more text to search, e.g. their chat notes, default ''
  *
  * Returns whether the person matches.
  */
-export function matchesQuery(person, query) {
+export function matchesQuery(person, query, extra = '') {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [person.name, person.howMet, person.notes, ...person.tags]
+  return [person.name, person.howMet, person.notes, extra, ...person.tags]
     .some((field) => String(field ?? '').toLowerCase().includes(q));
 }
 
