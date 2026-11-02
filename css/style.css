@@ -395,8 +395,8 @@ body {
 .field textarea { resize: vertical; line-height: 1.5; }
 .inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .inline .short { width: 4.5em; }
-.conn-add select { flex: 1 1 120px; }
-.conn-add input { flex: 1 1 110px; }
+.suggest-wrap { position: relative; display: flex; flex: 1 1 120px; min-width: 0; }
+.suggest-wrap input { flex: 1; min-width: 0; }
 .field-error { color: var(--star-overdue); font-size: 13px; margin: -6px 0 12px; }
 .field-error[hidden] { display: none; }
 

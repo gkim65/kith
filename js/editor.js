@@ -1,7 +1,7 @@
 // Person editor: the form the side panel switches to when adding or editing someone.
 
 import { DEFAULT_CADENCE_DAYS, todayISO } from './data.js';
-import { escapeHtml } from './html.js';
+import { createSuggest, escapeHtml, personSuggestions } from './html.js';
 import { MAX_CADENCE_DAYS, splitCadence } from './ui.js';
 
 /** Suggested labels for a connection between two people. */
@@ -58,9 +58,8 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
       <div class="field"><span>Tags</span>
         <div class="tag-editor">
           <span class="tag-chips"></span>
-          <input class="tag-input" list="tag-options" placeholder="add a tag…" autocomplete="off" />
+          <input class="tag-input" placeholder="add a tag…" autocomplete="off" />
         </div>
-        <datalist id="tag-options">${tags.map((t) => `<option value="${escapeHtml(t)}"></option>`).join('')}</datalist>
       </div>
 
       <label class="field"><span>How you know them</span>
@@ -72,12 +71,10 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
       <div class="field"><span>Connected to</span>
         <ul class="conn-list"></ul>
         <div class="inline conn-add">
-          <input class="conn-person" list="conn-people" placeholder="someone's name…" autocomplete="off" aria-label="Person to connect" />
-          <datalist id="conn-people">${others.map((p) => `<option value="${escapeHtml(p.name)}"></option>`).join('')}</datalist>
-          <input class="conn-label" list="link-labels" value="introduced by" aria-label="How they are connected" />
+          <span class="suggest-wrap"><input class="conn-person" placeholder="someone's name…" autocomplete="off" aria-label="Person to connect" /></span>
+          <span class="suggest-wrap"><input class="conn-label" value="introduced by" autocomplete="off" aria-label="How they are connected" /></span>
           <button type="button" class="btn conn-add-btn">add</button>
         </div>
-        <datalist id="link-labels">${LINK_LABELS.map((l) => `<option value="${l}"></option>`).join('')}</datalist>
       </div>
 
       <div class="editor-actions">
@@ -112,11 +109,24 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
     drawTags();
   }
 
+  // Tag suggestions: matching tags not yet chosen, plus the typed text as a new tag.
+  const tagSuggest = createSuggest(inner.querySelector('.tag-editor'));
+  const showTagSuggestions = () => {
+    const q = tagInput.value.trim().toLowerCase();
+    if (!q) { tagSuggest.hide(); return; }
+    const chosen = draft.tags.map((t) => t.toLowerCase());
+    const items = tags.filter((t) => t.toLowerCase().includes(q) && !chosen.includes(t.toLowerCase()))
+      .slice(0, 6).map((t) => ({ label: t, value: t }));
+    if (!tags.some((t) => t.toLowerCase() === q)) items.push({ label: `add "${tagInput.value.trim()}" as a new tag`, value: tagInput.value.trim(), isNew: true });
+    tagSuggest.show(items, (it) => { tagInput.value = it.value; addTag(); tagInput.focus(); });
+  };
+  tagInput.addEventListener('input', showTagSuggestions);
   tagInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); }
+    if (tagSuggest.key(e)) return;
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); tagSuggest.hide(); }
     if (e.key === 'Backspace' && !tagInput.value && draft.tags.length) { draft.tags.pop(); drawTags(); }
   });
-  tagInput.addEventListener('change', addTag);
+  tagInput.addEventListener('blur', () => setTimeout(() => { tagSuggest.hide(); addTag(); }, 120));
 
   function drawConns() {
     connList.innerHTML = draftLinks.map((l, i) => {
@@ -131,18 +141,55 @@ export function renderEditor(inner, { person, people, links, tags }, { onSave, o
     }));
   }
 
-  inner.querySelector('.conn-add-btn').addEventListener('click', () => {
-    const typed = inner.querySelector('.conn-person').value.trim();
-    const label = inner.querySelector('.conn-label').value.trim() || 'friends';
+  const connPerson = inner.querySelector('.conn-person');
+  const connLabel = inner.querySelector('.conn-label');
+  const personSuggest = createSuggest(connPerson);
+  const labelSuggest = createSuggest(connLabel);
+
+  connPerson.addEventListener('input', () => {
+    const q = connPerson.value.trim();
+    const taken = draftLinks.map((l) => (l.source === draft.id ? l.target : l.source)).filter(Boolean);
+    if (q) personSuggest.show(personSuggestions(others, q, taken), (it) => { connPerson.value = it.name; connLabel.focus(); connLabel.select(); });
+    else personSuggest.hide();
+  });
+  connPerson.addEventListener('keydown', (e) => {
+    if (personSuggest.key(e)) return;
+    if (e.key === 'Enter') { e.preventDefault(); connLabel.focus(); connLabel.select(); }
+  });
+  connPerson.addEventListener('blur', () => setTimeout(() => personSuggest.hide(), 120));
+
+  // Label suggestions: the usual ones plus any label already used. Focusing shows them all;
+  // typing narrows the list.
+  const allLabels = [...new Set([...LINK_LABELS, ...links.map((l) => l.label).filter(Boolean)])];
+  const showLabelSuggestions = (filter) => {
+    const q = filter ? connLabel.value.trim().toLowerCase() : '';
+    const items = allLabels.filter((l) => l.toLowerCase().includes(q)).slice(0, 8).map((l) => ({ label: l, value: l }));
+    labelSuggest.show(items, (it) => { connLabel.value = it.value; addConnection(); });
+  };
+  connLabel.addEventListener('focus', () => showLabelSuggestions(false));
+  connLabel.addEventListener('input', () => showLabelSuggestions(true));
+  connLabel.addEventListener('keydown', (e) => {
+    if (labelSuggest.key(e)) return;
+    if (e.key === 'Enter') { e.preventDefault(); addConnection(); }
+  });
+  connLabel.addEventListener('blur', () => setTimeout(() => labelSuggest.hide(), 120));
+
+  inner.querySelector('.conn-add-btn').addEventListener('click', addConnection);
+
+  function addConnection() {
+    const typed = connPerson.value.trim();
+    const label = connLabel.value.trim() || 'friends';
     if (!typed) return;
     const known = others.find((p) => p.name.toLowerCase() === typed.toLowerCase());
     const dup = known
       ? draftLinks.some((l) => l.source === known.id || l.target === known.id)
       : draftLinks.some((l) => l.newName && l.newName.toLowerCase() === typed.toLowerCase());
     if (!dup) draftLinks.push(known ? { source: draft.id, target: known.id, label } : { source: draft.id, target: null, newName: typed, label });
-    inner.querySelector('.conn-person').value = '';
+    connPerson.value = '';
+    labelSuggest.hide();
     drawConns();
-  });
+    connPerson.focus();
+  }
 
   drawTags();
   drawConns();
