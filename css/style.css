@@ -271,7 +271,9 @@ body {
 .cadence-num::-webkit-inner-spin-button, .cadence-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .cadence-num:focus, .cadence-unit:focus { outline: none; border-bottom-color: var(--accent); }
 .cadence-unit { cursor: pointer; }
-.panel .hint { color: var(--star-overdue); font-size: 13px; margin: -8px 0 14px; }
+/* With the hint showing, the row gives up its bottom gap so the hint sits just below it. */
+.cadence-row:has(+ .hint:not([hidden])) { margin-bottom: 8px; }
+.panel .hint { color: var(--star-overdue); font-size: 13px; line-height: 1.4; margin: 0 0 14px; }
 .panel .hint[hidden] { display: none; }
 
 /* ── About dialog ── */
