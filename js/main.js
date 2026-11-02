@@ -1,19 +1,22 @@
 // Entry point: wires the data layer, graph, and UI together.
 
 import { makeSample } from './sample.js';
-import { tagList } from './data.js';
+import { matchesQuery, tagList } from './data.js';
 import { renderConstellation } from './graph.js';
-import { initFontPicker, initThemeToggle, renderLegend, renderTagBar, showPerson } from './ui.js';
+import { initThemeToggle, renderLegend, renderPeopleList, renderTagList, showPerson } from './ui.js';
 
 const { people, links } = makeSample();
 const tags = tagList(people);
 const sky = document.getElementById('sky');
 const panel = document.getElementById('panel');
 const legend = document.getElementById('legend');
-const tagbar = document.getElementById('tagbar');
+const tagListEl = document.getElementById('tag-list');
+const peopleListEl = document.getElementById('people-list');
+const peopleCount = document.getElementById('people-count');
+const search = document.getElementById('search');
 const phone = window.matchMedia('(max-width: 700px)');
 
-const state = { selectedId: null, tag: null };
+const state = { selectedId: null, tag: null, query: '' };
 let graph;
 
 /** Size of the sky hidden behind the open panel, so the camera centres in what is left. */
@@ -23,8 +26,12 @@ function obstruction() {
 }
 
 function refresh() {
-  graph.highlight(state);
-  renderTagBar(tagbar, people, tags, state.tag, setTag);
+  const shown = people.filter((p) => matchesQuery(p, state.query) && (!state.tag || p.tags.includes(state.tag)));
+  const matches = state.query.trim() ? new Set(shown.map((p) => p.id)) : null;
+  graph.highlight({ selectedId: state.selectedId, tag: state.tag, matches });
+  renderTagList(tagListEl, people, tags, state.tag, setTag);
+  renderPeopleList(peopleListEl, shown, state.selectedId, pick);
+  peopleCount.textContent = shown.length === people.length ? people.length : `${shown.length} of ${people.length}`;
 }
 
 function pick(id) {
@@ -53,8 +60,13 @@ function draw() {
 
 draw();
 renderLegend(legend);
-initFontPicker(document.getElementById('font-pick'));
 initThemeToggle(document.getElementById('theme-toggle'), () => { graph.recolor(); renderLegend(legend); refresh(); });
+
+search.addEventListener('input', () => {
+  state.query = search.value;
+  if (state.selectedId) pick(null);
+  else refresh();
+});
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') pick(null); });
 

@@ -1,6 +1,6 @@
-// Page chrome: theme and font pickers, legend, tag bar, and the person detail panel.
+// Page chrome: theme toggle, legend, sidebar lists, and the person detail panel.
 
-import { daysSince } from './data.js';
+import { daysSince, driftRatio } from './data.js';
 import { recencyColor, tagColor } from './graph.js';
 
 /**
@@ -18,15 +18,18 @@ export function escapeHtml(text) {
 }
 
 /**
- * remember(key, value)
+ * agoText(days) -> string
  *
- * Save a per-browser preference; silently does nothing where storage is blocked.
+ * Short human phrase for days since the last chat.
  *
- *   - `key`   — localStorage key
- *   - `value` — string to store
+ *   - `days` — whole days (Infinity when never logged)
+ *
+ * Returns text such as "today", "1 day ago", "12 days ago" or "never".
  */
-function remember(key, value) {
-  try { localStorage.setItem(key, value); } catch (e) {}
+function agoText(days) {
+  if (!Number.isFinite(days)) return 'never';
+  if (days === 0) return 'today';
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 /**
@@ -43,25 +46,9 @@ export function initThemeToggle(button, onChange) {
   paint();
   button.addEventListener('click', () => {
     root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
-    remember('kith_theme', root.dataset.theme);
+    try { localStorage.setItem('kith_theme', root.dataset.theme); } catch (e) {}
     paint();
     onChange();
-  });
-}
-
-/**
- * initFontPicker(select)
- *
- * Wire the font-style dropdown; the choice is remembered in this browser.
- *
- *   - `select` — the `<select>` whose option values match the `data-font` styles in style.css
- */
-export function initFontPicker(select) {
-  const root = document.documentElement;
-  select.value = root.dataset.font;
-  select.addEventListener('change', () => {
-    root.dataset.font = select.value;
-    remember('kith_font', select.value);
   });
 }
 
@@ -87,37 +74,58 @@ export function renderLegend(el) {
 /**
  * tagChip(tag, tags, active, extra) -> string
  *
- * HTML for one clickable tag chip with its colour dot.
+ * HTML for one clickable tag with its colour dot.
  *
  *   - `tag`    — tag name
  *   - `tags`   — every tag in use, for the colour
  *   - `active` — whether this tag is the one currently lit
- *   - `extra`  — trusted HTML appended inside the chip (e.g. a count), default ''
+ *   - `extra`  — trusted HTML appended inside the button (e.g. a count), default ''
  *
  * Returns an HTML string.
  */
 function tagChip(tag, tags, active, extra = '') {
-  return `<button class="chip tag-chip${active ? ' active' : ''}" data-tag="${escapeHtml(tag)}">`
-    + `<span class="dot" style="background:${tagColor(tag, tags)}"></span>${escapeHtml(tag)}${extra}</button>`;
+  return `<button class="tag-chip${active ? ' active' : ''}" data-tag="${escapeHtml(tag)}">`
+    + `<span class="tag-name"><span class="dot" style="background:${tagColor(tag, tags)}"></span>${escapeHtml(tag)}</span>${extra}</button>`;
 }
 
 /**
- * renderTagBar(el, people, tags, activeTag, onTag)
+ * renderTagList(el, people, tags, activeTag, onTag)
  *
- * Show every tag as a chip, most-used first; clicking one lights up that group.
+ * List every tag, most-used first; clicking one lights up that group. A vertical list in the
+ * desktop sidebar and a scrolling chip row on phones (layout is in style.css).
  *
- *   - `el`        — the tag bar container
+ *   - `el`        — the tag list container
  *   - `people`    — all people, for the counts
  *   - `tags`      — every tag in use, from `tagList`
  *   - `activeTag` — the lit tag, or null
- *   - `onTag`     — called with a tag name when a chip is clicked
+ *   - `onTag`     — called with a tag name when one is clicked
  */
-export function renderTagBar(el, people, tags, activeTag, onTag) {
+export function renderTagList(el, people, tags, activeTag, onTag) {
   const count = (t) => people.filter((p) => p.tags.includes(t)).length;
   const sorted = [...tags].sort((a, b) => count(b) - count(a) || a.localeCompare(b));
   el.innerHTML = sorted
-    .map((t) => tagChip(t, tags, t === activeTag, ` <span class="count">${count(t)}</span>`)).join('');
+    .map((t) => tagChip(t, tags, t === activeTag, `<span class="count">${count(t)}</span>`)).join('');
   el.querySelectorAll('.tag-chip').forEach((b) => b.addEventListener('click', () => onTag(b.dataset.tag)));
+}
+
+/**
+ * renderPeopleList(el, people, selectedId, onPick)
+ *
+ * Alphabetical list of people with their recency colour and time since the last chat.
+ *
+ *   - `el`         — the `<ul>` to fill
+ *   - `people`     — the people to show (already filtered by search and tag)
+ *   - `selectedId` — the open person's id, or null
+ *   - `onPick`     — called with a person id when a row is clicked
+ */
+export function renderPeopleList(el, people, selectedId, onPick) {
+  const sorted = [...people].sort((a, b) => a.name.localeCompare(b.name));
+  el.innerHTML = sorted.map((p) => `
+    <li><button class="person-row${p.id === selectedId ? ' active' : ''}" data-id="${escapeHtml(p.id)}">
+      <span class="tag-name"><span class="dot" style="background:${recencyColor(driftRatio(p))}"></span>${escapeHtml(p.name)}</span>
+      <span class="count">${agoText(daysSince(p.lastChat))}</span>
+    </button></li>`).join('') || '<li class="empty">no one matches</li>';
+  el.querySelectorAll('.person-row').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
 }
 
 /**
@@ -136,7 +144,6 @@ export function renderTagBar(el, people, tags, activeTag, onTag) {
 export function showPerson(panel, person, people, links, tags, { onPick, onTag }) {
   if (!person) { panel.classList.remove('open'); return; }
   const byId = new Map(people.map((p) => [p.id, p]));
-  const days = daysSince(person.lastChat);
   const conns = links
     .filter((l) => l.source === person.id || l.target === person.id)
     .map((l) => ({ other: byId.get(l.source === person.id ? l.target : l.source), label: l.label }));
@@ -145,7 +152,7 @@ export function showPerson(panel, person, people, links, tags, { onPick, onTag }
   inner.innerHTML = `
     <button class="btn btn-ghost close" aria-label="Close">close</button>
     <h2>${escapeHtml(person.name)}</h2>
-    <div class="when">last talked ${days === 0 ? 'today' : `${days} day${days === 1 ? '' : 's'} ago`}
+    <div class="when">last talked ${agoText(daysSince(person.lastChat))}
       · check in every ${person.cadenceDays} days</div>
     <div class="chips">${person.tags.map((t) => tagChip(t, tags, false)).join('')}</div>
     <h3>How you know them</h3>

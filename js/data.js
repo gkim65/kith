@@ -50,3 +50,20 @@ export function driftRatio(person, today = new Date()) {
 export function tagList(people) {
   return [...new Set(people.flatMap((p) => p.tags))].sort((a, b) => a.localeCompare(b));
 }
+
+/**
+ * matchesQuery(person, query) -> boolean
+ *
+ * Case-insensitive search over a person's name, tags, how you met, and notes.
+ *
+ *   - `person` — person object
+ *   - `query`  — search text; blank matches everyone
+ *
+ * Returns whether the person matches.
+ */
+export function matchesQuery(person, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [person.name, person.howMet, person.notes, ...person.tags]
+    .some((field) => String(field ?? '').toLowerCase().includes(q));
+}

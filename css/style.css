@@ -7,6 +7,7 @@
   --text: #e8ecf8;
   --muted: #8a93b2;
   --border: rgba(255, 255, 255, 0.10);
+  --hover: rgba(255, 255, 255, 0.05);
   --line: rgba(180, 195, 255, 0.20);
   --accent: #ffd56b;
   --star-fresh: #ffd56b;
@@ -21,6 +22,7 @@
   --text: #1d2030;
   --muted: #6b6f80;
   --border: rgba(0, 0, 0, 0.10);
+  --hover: rgba(0, 0, 0, 0.04);
   --line: rgba(30, 40, 80, 0.22);
   --accent: #b7791f;
   --star-fresh: #d29a00;
@@ -29,27 +31,11 @@
   --star-lost: #b4b8c6;
 }
 
-/* Font styles, switched by data-font on <html>. */
 :root {
   --font-body: 'Nunito', system-ui, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
-  --font-name: var(--font-display);
-  --title-size: 30px;
-  --name-size: 13px;
-  --h2-size: 24px;
+  --sidebar-w: 260px;
   --ease: cubic-bezier(0.22, 0.8, 0.24, 1);
-}
-:root[data-font="handwritten"] {
-  --font-display: 'Caveat', cursive;
-  --font-name: 'Caveat', cursive;
-  --title-size: 40px;
-  --name-size: 18px;
-  --h2-size: 34px;
-}
-:root[data-font="bookish"] {
-  --font-body: 'Lora', Georgia, serif;
-  --font-display: 'Lora', Georgia, serif;
-  --font-name: 'Lora', Georgia, serif;
 }
 
 * { box-sizing: border-box; }
@@ -72,19 +58,13 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 20px 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: baseline; gap: 12px; }
-.brand h1 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: var(--title-size);
-  line-height: 1;
-}
+.brand h1 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 30px; line-height: 1; }
 .tagline { font-family: var(--font-display); font-style: italic; font-weight: 300; color: var(--muted); font-size: 16px; }
-:root[data-font="handwritten"] .tagline { font-style: normal; font-size: 22px; }
-.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.actions { display: flex; align-items: center; gap: 8px; }
 
 .search, .btn {
   font: inherit;
@@ -94,38 +74,63 @@ body {
   border-radius: 999px;
   padding: 7px 14px;
 }
-.search { width: 220px; max-width: 100%; }
 .btn { cursor: pointer; transition: border-color 0.2s; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
-.btn:disabled, .search:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-ghost { background: transparent; }
+.search { width: 100%; outline: none; transition: border-color 0.2s; }
+.search:focus { border-color: var(--accent); }
 
-/* ── Tag bar ── */
-.tagbar {
+/* ── Main layout: sidebar | sky ── */
+.layout { flex: 1; min-height: 0; display: flex; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: none;
   display: flex;
-  gap: 6px;
-  padding: 0 20px 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 12px 16px 16px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
 }
-.chip {
-  font: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+.side-section h3 {
+  margin: 0 0 6px 10px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 16px;
   color: var(--muted);
-  background: transparent;
 }
-.tag-chip { cursor: pointer; transition: color 0.25s, border-color 0.25s, background 0.25s; }
-.tag-chip:hover { color: var(--text); }
-.tag-chip.active { color: var(--text); border-color: var(--text); background: var(--panel); }
-.tag-chip .count { opacity: 0.6; }
+.side-section h3 .count { font-family: var(--font-body); font-style: normal; font-size: 13px; opacity: 0.7; }
+
+.tag-list, .people-list { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; list-style: none; }
+
+.tag-chip, .person-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.tag-chip:hover, .person-row:hover { background: var(--hover); }
+.tag-chip.active, .person-row.active { background: var(--panel); border-color: var(--border); }
+.tag-name { display: inline-flex; align-items: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.people-list .empty { color: var(--muted); padding: 5px 10px; font-size: 14px; }
 
 /* ── Sky ── */
-.stage { position: relative; flex: 1; min-height: 0; display: flex; overflow: hidden; }
+.stage { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; }
 .sky-wrap { position: relative; flex: 1; min-width: 0; min-height: 0; }
 #sky { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
 #sky:active { cursor: grabbing; }
@@ -140,22 +145,20 @@ body {
 :root[data-theme="light"] .nebula circle { opacity: 0.3; }
 
 .link { stroke: var(--line); stroke-width: 1; transition: opacity 0.5s var(--ease); }
-.link.dim { opacity: 0.12; }
+.link.dim { opacity: 0.1; }
 
 .node { cursor: pointer; transition: opacity 0.5s var(--ease); }
-.node .halo { opacity: 0.25; transition: opacity 0.3s; }
+.node .halo { opacity: 0.2; transition: opacity 0.3s; }
 .node:hover .halo { opacity: 0.45; }
 :root[data-theme="light"] .node .halo { opacity: 0.12; }
 .node .label {
   fill: var(--text);
-  font-family: var(--font-name);
-  font-size: var(--name-size);
+  font-family: var(--font-display);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.35s var(--ease);
   paint-order: stroke;
   stroke: var(--bg);
-  stroke-width: 3px;
 }
 #sky.zoomed .node .label,
 .node:hover .label,
@@ -163,8 +166,9 @@ body {
 .node.neighbour .label,
 .node.tagged .label,
 .node.me .label { opacity: 1; }
+.node.crowded:not(:hover) .label { opacity: 0; }
 .node.selected .core { stroke: var(--text); stroke-width: 1.5px; }
-.node.dim { opacity: 0.18; }
+.node.dim { opacity: 0.15; }
 
 .node.me { cursor: default; }
 .node.me .core { fill: var(--text); }
@@ -190,11 +194,10 @@ body {
 }
 .panel.open { transform: none; opacity: 1; pointer-events: auto; }
 .panel-inner { padding: 20px 22px 28px; }
-.panel h2 { margin: 0 0 4px; font-family: var(--font-name); font-weight: 500; font-size: var(--h2-size); line-height: 1.15; }
+.panel h2 { margin: 0 0 4px; font-family: var(--font-display); font-weight: 500; font-size: 24px; line-height: 1.15; }
 .panel .close { float: right; font-size: 13px; padding: 4px 12px; }
 .panel .when { color: var(--muted); margin-bottom: 14px; }
 .panel h3 { margin: 18px 0 4px; font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 16px; color: var(--muted); }
-:root[data-font="handwritten"] .panel h3 { font-style: normal; font-size: 21px; }
 .panel p { margin: 0; line-height: 1.55; }
 .panel ul { margin: 0; padding: 0; list-style: none; }
 .panel li { padding: 3px 0; }
@@ -202,9 +205,12 @@ body {
 .panel .linkish:hover { text-decoration-color: var(--accent); }
 .panel .rel { color: var(--muted); }
 
+/* Tags inside the panel are compact chips. */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips .tag-chip { width: auto; border-color: var(--border); border-radius: 999px; padding: 2px 10px; font-size: 13px; color: var(--muted); }
+.chips .tag-chip:hover { color: var(--text); }
 
-.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+.dot { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
 
 /* ── Legend ── */
 .legend {
@@ -216,13 +222,30 @@ body {
   color: var(--muted);
   font-size: 13px;
 }
+.legend .dot { margin-right: 6px; vertical-align: middle; display: inline-block; }
 
-/* ── Phone width: panel becomes a bottom sheet ── */
+/* ── Phone width: sidebar folds into a search box and a scrolling tag row; panel is a bottom sheet ── */
 @media (max-width: 700px) {
-  .topbar { padding: 12px 16px 8px; }
-  .search { width: 100%; }
-  .actions { width: 100%; }
-  .tagbar { padding: 0 16px 10px; }
+  .topbar { padding: 12px 16px; }
+  .layout { flex-direction: column; }
+  .sidebar {
+    width: 100%;
+    gap: 10px;
+    padding: 10px 16px;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .side-section h3, .people-section { display: none; }
+  .tag-list { flex-direction: row; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .tag-list .tag-chip {
+    width: auto;
+    flex: none;
+    border-color: var(--border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 13px;
+  }
   .panel {
     top: auto;
     left: 0;

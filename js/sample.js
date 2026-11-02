@@ -76,7 +76,8 @@ export function makeSample(today = new Date()) {
   });
   for (let k = 0; k < 5; k++) {
     const a = pick(people), b = pick(people);
-    if (a.id !== b.id) links.push({ source: a.id, target: b.id, label: 'friends' });
+    const exists = links.some((l) => (l.source === a.id && l.target === b.id) || (l.source === b.id && l.target === a.id));
+    if (a.id !== b.id && !exists) links.push({ source: a.id, target: b.id, label: 'friends' });
   }
   return { people, links };
 }
