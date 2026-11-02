@@ -258,16 +258,46 @@ body {
 .panel h2 { margin: 0 0 4px; font-family: var(--font-display); font-weight: 500; font-size: 24px; line-height: 1.15; }
 .panel .close { float: right; font-size: 13px; padding: 4px 12px; }
 .panel .when { display: block; color: var(--muted); margin-bottom: 4px; }
-.panel label.when { margin-bottom: 14px; }
-.cadence {
+.cadence-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.cadence-num, .cadence-unit {
   font: inherit;
   color: var(--text);
   background: transparent;
   border: none;
   border-bottom: 1px dashed var(--muted);
   padding: 0 2px;
-  cursor: pointer;
 }
+.cadence-num { width: 3.2em; text-align: center; -moz-appearance: textfield; }
+.cadence-num::-webkit-inner-spin-button, .cadence-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.cadence-num:focus, .cadence-unit:focus { outline: none; border-bottom-color: var(--accent); }
+.cadence-unit { cursor: pointer; }
+.panel .hint { color: var(--star-overdue); font-size: 13px; margin: -8px 0 14px; }
+.panel .hint[hidden] { display: none; }
+
+/* ── About dialog ── */
+.about {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100% - 64px);
+  overflow-y: auto;
+  padding: 26px 30px 30px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  line-height: 1.6;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), overlay 0.35s allow-discrete, display 0.35s allow-discrete;
+}
+.about[open] { opacity: 1; transform: none; }
+@starting-style { .about[open] { opacity: 0; transform: translateY(10px); } }
+.about::backdrop { background: rgba(5, 8, 20, 0.55); backdrop-filter: blur(3px); }
+.about h2 { margin: 0 0 14px; font-family: var(--font-display); font-weight: 500; font-size: 28px; }
+.about .close { float: right; font-size: 13px; padding: 4px 12px; }
+.about p { margin: 0 0 14px; }
+.about .lede { font-family: var(--font-display); font-weight: 300; font-size: 18px; line-height: 1.5; }
+.about a { color: var(--text); text-decoration-color: var(--accent); text-underline-offset: 3px; }
+@media (max-width: 700px) { .about { padding: 20px 20px 24px; } }
 .panel h3 { margin: 18px 0 4px; font-family: var(--font-display); font-style: italic; font-weight: 300; font-size: 16px; color: var(--muted); }
 .panel p { margin: 0; line-height: 1.55; }
 .panel ul { margin: 0; padding: 0; list-style: none; }

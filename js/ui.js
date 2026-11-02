@@ -180,8 +180,6 @@ export function renderReachOut(el, picks, selectedId, onPick) {
   el.querySelectorAll('.person-row').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
 }
 
-/** Check-in cadence choices offered in the person panel: [days, label]. */
-const CADENCES = [[7, 'week'], [14, '2 weeks'], [30, 'month'], [60, '2 months'], [90, '3 months'], [180, '6 months'], [365, 'year']];
 
 /**
  * showPerson(panel, person, people, links, tags, { onPick, onTag, onCadence })
@@ -209,8 +207,12 @@ export function showPerson(panel, person, people, links, tags, { onPick, onTag, 
     <button class="btn btn-ghost close" aria-label="Close">close</button>
     <h2>${escapeHtml(person.name)}</h2>
     <div class="when">last talked ${agoText(daysSince(person.lastChat))}</div>
-    <label class="when">check in every
-      <select class="cadence" aria-label="Check-in cadence">${cadenceOptions(person.cadenceDays)}</select></label>
+    <div class="when cadence-row">check in every
+      <input class="cadence-num" type="number" min="1" step="1" inputmode="numeric" aria-label="Check-in every how many" />
+      <select class="cadence-unit" aria-label="Check-in unit" title="a month counts as 30 days">
+        <option value="1">days</option><option value="7">weeks</option><option value="30">months</option>
+      </select></div>
+    <div class="hint" hidden>use a whole number, from 1 day up to 2 years</div>
     <div class="chips">${person.tags.map((t) => tagChip(t, tags, false)).join('')}</div>
     <h3>How you know them</h3>
     <p>${escapeHtml(person.howMet)}</p>
@@ -222,7 +224,7 @@ export function showPerson(panel, person, people, links, tags, { onPick, onTag, 
   inner.querySelector('.close').addEventListener('click', () => onPick(null));
   inner.querySelectorAll('.linkish').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
   inner.querySelectorAll('.tag-chip').forEach((b) => b.addEventListener('click', () => onTag(b.dataset.tag)));
-  inner.querySelector('.cadence').addEventListener('change', (e) => onCadence(person.id, Number(e.target.value)));
+  wireCadence(inner, person, onCadence);
 
   if (panel.classList.contains('open')) {
     inner.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
@@ -231,17 +233,71 @@ export function showPerson(panel, person, people, links, tags, { onPick, onTag, 
   panel.classList.add('open');
 }
 
+
+/** Longest allowed check-in cadence (days). */
+const MAX_CADENCE_DAYS = 730;
+
 /**
- * cadenceOptions(current) -> string
+ * splitCadence(days) -> [number, number]
  *
- * `<option>` list for the cadence picker; a non-preset current value is kept as its own option.
+ * Express a cadence in the largest unit that divides it evenly (months of 30 days, weeks, days).
  *
- *   - `current` — the person's cadence (days)
+ *   - `days` — cadence (days)
  *
- * Returns an HTML string.
+ * Returns [count, unit length in days].
  */
-function cadenceOptions(current) {
-  const list = CADENCES.some(([d]) => d === current) ? CADENCES : [...CADENCES, [current, `${current} days`]]
-    .sort((a, b) => a[0] - b[0]);
-  return list.map(([d, label]) => `<option value="${d}"${d === current ? ' selected' : ''}>${label}</option>`).join('');
+function splitCadence(days) {
+  if (days % 30 === 0) return [days / 30, 30];
+  if (days % 7 === 0) return [days / 7, 7];
+  return [days, 1];
+}
+
+/**
+ * wireCadence(inner, person, onCadence)
+ *
+ * Fill and wire the "check in every [n] [unit]" editor. Anything that is not a whole number
+ * between 1 day and 2 years is rejected: the old value comes back and a hint shows.
+ *
+ *   - `inner`     — panel content element holding the editor
+ *   - `person`    — the person being shown
+ *   - `onCadence` — called with (person id, days) when a valid new cadence is entered
+ */
+function wireCadence(inner, person, onCadence) {
+  const num = inner.querySelector('.cadence-num');
+  const unit = inner.querySelector('.cadence-unit');
+  const hint = inner.querySelector('.hint');
+  const names = { 1: 'day', 7: 'week', 30: 'month' };
+  const plural = () => {
+    const one = Number(num.value) === 1;
+    [...unit.options].forEach((o) => { o.text = names[o.value] + (one ? '' : 's'); });
+  };
+  const show = (days) => { const [n, u] = splitCadence(days); num.value = n; unit.value = u; plural(); };
+  show(person.cadenceDays);
+  const commit = () => {
+    const n = Number(num.value);
+    const days = n * Number(unit.value);
+    const ok = Number.isInteger(n) && n >= 1 && days <= MAX_CADENCE_DAYS;
+    hint.hidden = ok;
+    if (!ok) { show(person.cadenceDays); return; }
+    if (days !== person.cadenceDays) onCadence(person.id, days);
+  };
+  num.addEventListener('input', plural);
+  num.addEventListener('change', commit);
+  num.addEventListener('keydown', (e) => { if (e.key === 'Enter') num.blur(); });
+  unit.addEventListener('change', commit);
+}
+
+/**
+ * initAbout(openBtn, dialog)
+ *
+ * Wire the about dialog: the header button opens it; the close button, Esc, or a click on the
+ * backdrop closes it.
+ *
+ *   - `openBtn` — the header "about" button
+ *   - `dialog`  — the `<dialog>` element
+ */
+export function initAbout(openBtn, dialog) {
+  openBtn.addEventListener('click', () => dialog.showModal());
+  dialog.querySelector('.close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
 }

@@ -27,9 +27,26 @@
   </div>
   <div class="actions">
     <button class="btn" disabled title="Logging chats arrives in milestone 3">+ log a chat</button>
+    <button class="btn btn-ghost" id="about-open">about</button>
     <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle light and dark theme"></button>
   </div>
 </header>
+
+<dialog class="about" id="about" aria-labelledby="about-title">
+  <button class="btn btn-ghost close" aria-label="Close">close</button>
+  <h2 id="about-title">About Kith</h2>
+  <p class="lede"><em>Kith</em> is an old word for your friends and acquaintances, as in "kith and kin".
+    It grew out of words for knowledge and acquaintance, so your kith are, quite literally, the people you know.</p>
+  <p>It is easy to drift from people. Usually nothing goes wrong; time just passes, and someone you
+    cared about slowly slips out of reach. Kith is a small place to keep track of your people and
+    keep them close: who you have talked to, what you talked about, and who you might want to reach out to next.</p>
+  <p>Every star is someone you know. The closer they sit to you, the more recently you talked. When
+    it has been longer than you meant, they drift outward and fade, and they show up in
+    "reach out today" as a nudge.</p>
+  <p>Made by Grace, with help from Claude. I hope it helps you keep your people close. If you have
+    suggestions, or would like to use Kith yourself, get in touch through
+    <a href="https://gkim65.github.io" target="_blank" rel="noopener">my website</a>.</p>
+</dialog>
 
 <div class="layout">
   <aside class="sidebar" aria-label="Search, tags and people">

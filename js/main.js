@@ -3,7 +3,7 @@
 import { makeSample } from './sample.js';
 import { matchesQuery, pickReachOut, tagList, todayISO } from './data.js';
 import { renderConstellation } from './graph.js';
-import { initThemeToggle, renderLegend, renderPeopleList, renderReachOut, renderTagList, showPerson } from './ui.js';
+import { initAbout, initThemeToggle, renderLegend, renderPeopleList, renderReachOut, renderTagList, showPerson } from './ui.js';
 
 const { people, links } = makeSample();
 const tags = tagList(people);
@@ -82,6 +82,7 @@ function draw() {
 
 draw();
 renderLegend(legend);
+initAbout(document.getElementById('about-open'), document.getElementById('about'));
 initThemeToggle(document.getElementById('theme-toggle'), () => { graph.recolor(); renderLegend(legend); refresh(); });
 
 search.addEventListener('input', () => {
