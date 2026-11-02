@@ -4,10 +4,42 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Kith</title>
+<script>
+  // Set the theme before first paint so the page does not flash the wrong colours.
+  (function () {
+    let t = null;
+    try { t = localStorage.getItem('kith_theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-<main id="app"></main>
+<header class="topbar">
+  <div class="brand">
+    <h1>Kith</h1>
+    <span class="tagline">the friends in our orbit</span>
+  </div>
+  <div class="actions">
+    <input class="search" type="search" placeholder="search people, tags, notes…" disabled title="Search arrives in milestone 4" />
+    <button class="btn" disabled title="Logging chats arrives in milestone 3">+ log a chat</button>
+    <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle light and dark theme"></button>
+  </div>
+</header>
+
+<main class="stage">
+  <div class="sky-wrap"><svg id="sky" role="img" aria-label="Constellation of people"></svg></div>
+  <aside id="panel" class="panel" hidden></aside>
+</main>
+
+<footer class="legend" id="legend"></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
