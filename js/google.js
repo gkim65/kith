@@ -96,7 +96,11 @@ export async function gfetch(url, options = {}) {
   });
   if (res.status === 401) { token = null; throw new AuthError('token rejected'); }
   if (!res.ok) {
-    const err = new Error(`Google API ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    // Google explains the problem in error.message (e.g. "Google Drive API has not been used…").
+    const text = await res.text();
+    let detail = text.slice(0, 300);
+    try { detail = JSON.parse(text).error.message || detail; } catch (e) {}
+    const err = new Error(`Google said (${res.status}): ${detail}`);
     err.status = res.status;
     throw err;
   }

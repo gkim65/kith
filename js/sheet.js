@@ -65,7 +65,33 @@ export async function ensureSheet() {
   const found = await gfetch(`${DRIVE}?q=${q}&orderBy=modifiedTime desc&fields=files(id)&pageSize=10`);
   id = found.files && found.files.length ? found.files[0].id : await createSheet();
   try { localStorage.setItem(SHEET_KEY, id); } catch (e) {}
+  await ensureTabs(id);
   return id;
+}
+
+/** Sheets whose tabs were already checked during this page visit. */
+const tabsChecked = new Set();
+
+/**
+ * ensureTabs(id) -> Promise<void>
+ *
+ * Add any of Kith's tabs that are missing, e.g. when creating the sheet was interrupted. Existing
+ * tabs, including ones you made yourself, are never renamed or removed.
+ *
+ *   - `id` — spreadsheet id
+ */
+async function ensureTabs(id) {
+  if (tabsChecked.has(id)) return;
+  const book = await gfetch(`${SHEETS}/${id}?fields=sheets.properties.title`);
+  const titles = book.sheets.map((s) => s.properties.title);
+  const missing = TABS.filter((t) => !titles.includes(t));
+  if (missing.length) {
+    await gfetch(`${SHEETS}/${id}:batchUpdate`, {
+      method: 'POST',
+      body: JSON.stringify({ requests: missing.map((title) => ({ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } })) }),
+    });
+  }
+  tabsChecked.add(id);
 }
 
 /** Create the Kith spreadsheet with its four tabs and frozen header rows. Returns its id. */
@@ -240,4 +266,31 @@ export async function writeSheet(id, data, layout) {
     method: 'POST',
     body: JSON.stringify({ valueInputOption: 'RAW', data: body }),
   });
+}
+
+/**
+ * appendBackups(id, rows) -> Promise<void>
+ *
+ * Add rows to the sheet's Backups tab, creating the tab the first time anything needs keeping.
+ *
+ *   - `id`   — spreadsheet id
+ *   - `rows` — `[saved_at, kind, what, details]` rows to append
+ */
+export async function appendBackups(id, rows) {
+  const append = () => gfetch(`${SHEETS}/${id}/values/${encodeURIComponent('Backups!A1')}:append`
+    + '?valueInputOption=RAW&insertDataOption=INSERT_ROWS', { method: 'POST', body: JSON.stringify({ values: rows }) });
+  try {
+    await append();
+  } catch (e) {
+    if (e.status !== 400) throw e;
+    await gfetch(`${SHEETS}/${id}:batchUpdate`, {
+      method: 'POST',
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title: 'Backups', gridProperties: { frozenRowCount: 1 } } } }] }),
+    });
+    await gfetch(`${SHEETS}/${id}/values/${encodeURIComponent('Backups!A1:D1')}?valueInputOption=RAW`, {
+      method: 'PUT',
+      body: JSON.stringify({ values: [['saved_at', 'kind', 'what', 'details']] }),
+    });
+    await append();
+  }
 }

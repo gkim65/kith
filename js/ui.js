@@ -385,15 +385,17 @@ const SYNC_LABELS = {
 };
 
 /**
- * showSyncStatus(button, status)
+ * showSyncStatus(button, status, detail)
  *
  * Update the header sync button for a status from `createSync`.
  *
  *   - `button` — the sync status `<button>`
  *   - `status` — 'local', 'reconnect', 'syncing', 'synced', 'offline' or 'paused'
+ *   - `detail` — why it is offline, shown on hover and kept for the retry click, default ''
  */
-export function showSyncStatus(button, status) {
+export function showSyncStatus(button, status, detail = '') {
   button.dataset.status = status;
+  button.dataset.detail = detail;
   button.querySelector('.sync-label').textContent = SYNC_LABELS[status] || status;
-  button.title = status === 'synced' ? `synced at ${new Date().toLocaleTimeString()}` : '';
+  button.title = status === 'synced' ? `synced at ${new Date().toLocaleTimeString()}` : detail;
 }

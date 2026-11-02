@@ -3,7 +3,7 @@
 import { makeSample } from './sample.js';
 import { matchesQuery, pickReachOut, tagList, todayISO } from './data.js';
 import { renderConstellation } from './graph.js';
-import { loadStore, newId, saveStore, stubPerson } from './store.js';
+import { loadStore, newId, normalizeData, saveStore, stubPerson } from './store.js';
 import { createSync } from './sync.js';
 import { sheetUrl } from './sheet.js';
 import { renderEditor } from './editor.js';
@@ -13,7 +13,12 @@ import {
   renderTagList, showPerson, showSyncStatus, showToast,
 } from './ui.js';
 
-const data = loadStore();
+// Until someone signs in (or a returning visitor continues offline), the page is a faint preview of
+// sample people behind the welcome screen. Nobody's real sky is shown before they choose to enter.
+let linkedBefore = false;
+try { linkedBefore = localStorage.getItem('kith_google') === '1'; } catch (e) {}
+let previewing = true;
+const data = normalizeData({ me: { name: '' }, ...makeSample() });
 let tags = tagList(data.people);
 let allLinks = data.links.concat(logLinks(data.logs, data.links));
 
@@ -43,7 +48,7 @@ let reach = reachPicks();
 
 /** Save in this browser and redraw. */
 function persist() {
-  if (!saveStore(data)) showToast('could not save in this browser; changes will be lost on reload');
+  if (!previewing && !saveStore(data)) showToast('could not save in this browser; changes will be lost on reload');
   tags = tagList(data.people);
   allLinks = data.links.concat(logLinks(data.logs, data.links));
   reach = reachPicks();
@@ -52,6 +57,7 @@ function persist() {
 
 /** After any change to people, connections, or chats: save here first, then let sync carry it to the sheet. */
 function commit() {
+  if (previewing) return;
   persist();
   sync.changed();
 }
@@ -72,7 +78,10 @@ const sync = createSync({
       pick(state.selectedId);
     }
   },
-  onStatus: (status) => showSyncStatus(syncBtn, status),
+  onStatus: (status, detail) => {
+    showSyncStatus(syncBtn, status, detail);
+    updateSheetLink();
+  },
   ask: (message) => askYesNo(askDialog, message),
   notify: showToast,
 });
@@ -275,11 +284,11 @@ syncBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   const status = syncBtn.dataset.status;
   if (status === 'local' || status === 'reconnect') sync.connectNow();
-  else if (status === 'offline' || status === 'paused') sync.syncNow();
-  else if (status === 'synced') {
-    syncMenu.querySelector('#open-sheet').href = sheetUrl(sync.sheetId());
-    syncMenu.hidden = !syncMenu.hidden;
+  else if (status === 'offline' || status === 'paused') {
+    if (syncBtn.dataset.detail) showToast(`retrying… last problem: ${syncBtn.dataset.detail}`);
+    sync.syncNow();
   }
+  else if (status === 'synced') syncMenu.hidden = !syncMenu.hidden;
 });
 document.addEventListener('click', (e) => { if (!syncMenu.contains(e.target)) syncMenu.hidden = true; });
 document.getElementById('sync-now').addEventListener('click', () => { syncMenu.hidden = true; sync.syncNow(); });
@@ -288,6 +297,32 @@ document.getElementById('sync-off').addEventListener('click', async () => {
   const ok = await askYesNo(askDialog, 'Disconnect from Google? Your people stay in this browser and in your sheet.', 'disconnect', 'cancel');
   if (ok) sync.stop();
 });
+
+// For shared computers: sign out and remove everything Kith saved in this browser. Refused while
+// any change has not reached the sheet yet, so erasing can never lose data.
+document.getElementById('sync-erase').addEventListener('click', async () => {
+  syncMenu.hidden = true;
+  if (sync.hasUnsynced()) {
+    showToast('some changes have not reached your sheet yet; sync first, then erase');
+    return;
+  }
+  const ok = await askYesNo(askDialog, 'Sign out and erase everything Kith saved in this browser? Your Google Sheet keeps all of it, '
+    + 'and you can sign in again any time.', 'erase this browser', 'cancel');
+  if (!ok) return;
+  sync.stop();
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('kith_') && k !== 'kith_theme').forEach((k) => localStorage.removeItem(k));
+  } catch (e) {}
+  location.reload();
+});
+
+/** Show the "open sheet" button once this browser knows which sheet it syncs with. */
+function updateSheetLink() {
+  const link = document.getElementById('sheet-link');
+  const id = sync.sheetId();
+  link.hidden = !id || previewing;
+  if (id) link.href = sheetUrl(id);
+}
 initAbout(document.getElementById('about-open'), document.getElementById('about'));
 initThemeToggle(document.getElementById('theme-toggle'), () => { graph.recolor(); renderLegend(legend); refresh(); });
 
@@ -310,13 +345,6 @@ document.getElementById('add-person').addEventListener('click', () => {
   if (!busyEditing()) edit(null);
 });
 
-// Sample people for trying Kith out; to be removed before launch.
-document.getElementById('load-sample').addEventListener('click', () => {
-  const { people, links } = makeSample();
-  data.people = people;
-  data.links = links;
-  commit();
-});
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !state.editing && !document.querySelector('dialog[open]')) pick(null);
@@ -325,4 +353,35 @@ document.addEventListener('keydown', (e) => {
 let resizeTimer;
 window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(draw, 200); });
 
-if (!data.me.name) renameMe();
+const welcome = document.getElementById('welcome');
+
+/**
+ * Leave the welcome screen: sign in with Google (if asked), swap the sample preview for this
+ * browser's real saved sky before anything syncs, then sync and ask for a name if there is none.
+ */
+async function enter(withGoogle) {
+  if (withGoogle && !(await sync.signIn())) return;
+  const real = loadStore();
+  data.me = real.me;
+  data.people = real.people;
+  data.links = real.links;
+  data.logs = real.logs;
+  previewing = false;
+  updateSheetLink();
+  document.body.classList.remove('previewing');
+  welcome.hidden = true;
+  persist();
+  if (withGoogle) await sync.syncNow();
+  if (!data.me.name) renameMe();
+}
+
+if (linkedBefore) {
+  const savedName = loadStore().me.name;
+  welcome.querySelector('.welcome-title').textContent = savedName ? `Welcome back, ${savedName}` : 'Welcome back';
+  welcome.querySelector('.welcome-signin').textContent = 'continue with Google';
+  welcome.querySelector('.welcome-offline').hidden = false;
+}
+document.body.classList.add('previewing');
+welcome.hidden = false;
+welcome.querySelector('.welcome-signin').addEventListener('click', () => enter(true));
+welcome.querySelector('.welcome-offline').addEventListener('click', () => enter(false));

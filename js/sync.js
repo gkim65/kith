@@ -5,7 +5,7 @@
 // The browser copy is always saved first, so a failed or skipped sync loses nothing.
 
 import { AuthError, connect, disconnect, isConnected, loadGoogle } from './google.js';
-import { ensureSheet, readSheet, rememberedSheetId, writeSheet } from './sheet.js';
+import { appendBackups, ensureSheet, readSheet, rememberedSheetId, writeSheet } from './sheet.js';
 import { normalizeData } from './store.js';
 
 const DIRTY_KEY = 'kith_dirty';
@@ -97,7 +97,7 @@ function mergeMap(base, mine, theirs) {
  *   - `mine`   — this browser's sky
  *   - `theirs` — the sheet's sky
  *
- * Returns the merged sky and any overruled sheet records.
+ * Returns the merged sky and any overruled sheet records as `{ kind, value }`.
  */
 export function merge3(base, mine, theirs) {
   const B = toMaps(base);
@@ -108,7 +108,7 @@ export function merge3(base, mine, theirs) {
   ['people', 'logs', 'links', 'me'].forEach((kind) => {
     const r = mergeMap(B[kind], M[kind], T[kind]);
     merged[kind] = r.out;
-    conflicts.push(...r.conflicts);
+    conflicts.push(...r.conflicts.map((value) => ({ kind, value })));
   });
   return { merged: fromMaps(merged), conflicts };
 }
@@ -116,6 +116,23 @@ export function merge3(base, mine, theirs) {
 /** Whether two skies hold exactly the same data. */
 export function sameData(a, b) {
   return stable(normalizeData(a)) === stable(normalizeData(b));
+}
+
+/**
+ * friendlyReason(err) -> string
+ *
+ * Plain-language reason for a failed sync, keeping Google's own message for anything unrecognised.
+ *
+ *   - `err` — the error thrown during sync
+ */
+function friendlyReason(err) {
+  const m = String(err && err.message);
+  if (/has not been used|is disabled|accessNotConfigured/i.test(m)) {
+    const api = /sheets/i.test(m) ? 'Google Sheets API' : 'Google Drive API';
+    return `the ${api} is not turned on in your Google Cloud project yet (APIs & Services, Library). ${m}`;
+  }
+  if (/Failed to fetch|NetworkError|network/i.test(m)) return 'no internet connection; your changes are saved in this browser';
+  return m;
 }
 
 /** Append overruled or replaced data to a capped backup list in this browser. */
@@ -127,25 +144,29 @@ function backup(key, value) {
 }
 
 /**
- * createSync({ getData, applyData, onStatus, ask, notify }) -> { start, connectNow, changed, syncNow, stop, sheetId }
+ * createSync({ getData, applyData, onStatus, ask, notify }) -> { start, signIn, connectNow, changed, syncNow, stop, sheetId, linked, hasUnsynced }
  *
  * The sync loop for this page.
  *
  *   - `getData`   — returns this browser's current sky
  *   - `applyData` — called with a merged sky to save in the browser and redraw
  *   - `onStatus`  — called with a status: 'local' (never linked), 'reconnect', 'syncing', 'synced',
- *                   'offline' (will retry), or 'paused' (waiting on the user)
+ *                   'offline' (will retry), or 'paused' (waiting on the user); for 'offline' the
+ *                   second argument is the reason
  *   - `ask`       — `(message) => Promise<boolean>` for safety questions
  *   - `notify`    — `(message) => void` for short notices
  *
- * Returns handles: `start()` on page load; `connectNow()` from a click; `changed()` after every
- * local edit; `syncNow()`; `stop()` to disconnect; `sheetId()` for the open-sheet link.
+ * Returns handles: `start()` on page load; `signIn()` from a click (token only, resolves true on
+ * success); `connectNow()` from a click (sign in, then sync); `changed()` after every local edit;
+ * `syncNow()`; `stop()` to disconnect; `sheetId()` for the open-sheet link; `linked()` for whether
+ * this browser has synced with a sheet before; `hasUnsynced()` for changes not yet in the sheet.
  */
 export function createSync({ getData, applyData, onStatus, ask, notify }) {
   let running = false;
   let again = false;
   let timer = null;
   let retryMs = 5000;
+  let lastError = null;
   let sheet = rememberedSheetId();
 
   const linked = () => readLS(LINKED_KEY) === '1';
@@ -164,9 +185,20 @@ export function createSync({ getData, applyData, onStatus, ask, notify }) {
     try {
       sheet = await ensureSheet();
       const remote = await readSheet(sheet);
-      const mineAtStart = getData();
+      let mineAtStart = getData();
       const hasBase = readLS(baseKey(sheet)) !== null;
       let base = loadBase(sheet);
+
+      // People saved in this browser before it was ever linked to this sheet: ask before uploading.
+      if (!hasBase && mineAtStart.people.length && !remote.data.people.length) {
+        const upload = await ask(`This browser already has ${mineAtStart.people.length} people saved from before you signed in. `
+          + 'Add them to your Google Sheet? (Choosing no starts fresh; this browser\'s copy is kept as a backup.)');
+        if (!upload) {
+          backup('kith_backup_browser', mineAtStart);
+          mineAtStart = normalizeData({ me: mineAtStart.me });
+          applyData(mineAtStart);
+        }
+      }
 
       // First sync of this browser with this sheet while both hold people: ask before combining.
       if (!hasBase && mineAtStart.people.length && remote.data.people.length) {
@@ -193,9 +225,20 @@ export function createSync({ getData, applyData, onStatus, ask, notify }) {
       }
       writeLS(baseKey(sheet), JSON.stringify(merged));
       writeLS(LINKED_KEY, '1');
+      lastError = null;
       if (conflicts.length) {
+        // The overruled versions go to the sheet's Backups tab (and this browser, in case that fails).
         backup('kith_backup_conflicts', conflicts);
-        notify('a change made elsewhere clashed with yours; kept yours and backed up the other in this browser');
+        const at = new Date().toISOString();
+        const rows = conflicts.map(({ kind, value }) => [at, kind,
+          typeof value === 'string' ? value : value.name || value.label || String(value.note || '').slice(0, 60),
+          JSON.stringify(value)]);
+        try {
+          await appendBackups(sheet, rows);
+          notify('the same thing was changed in two places; kept this one and saved the other in the Backups tab');
+        } catch (e) {
+          notify('the same thing was changed in two places; kept this one and saved the other in this browser');
+        }
       }
 
       // Fold the merge into whatever was edited here while the sync was running.
@@ -210,7 +253,11 @@ export function createSync({ getData, applyData, onStatus, ask, notify }) {
     } catch (e) {
       if (e instanceof AuthError) onStatus('reconnect');
       else {
-        onStatus('offline');
+        console.warn('Kith sync failed:', e);
+        // Say why once per new reason, rather than on every retry.
+        if (e.message !== lastError) notify(`could not sync: ${friendlyReason(e)}`);
+        lastError = e.message;
+        onStatus('offline', friendlyReason(e));
         timer = setTimeout(syncNow, retryMs);
         retryMs = Math.min(retryMs * 2, 5 * 60 * 1000);
       }
@@ -227,14 +274,18 @@ export function createSync({ getData, applyData, onStatus, ask, notify }) {
       window.addEventListener('focus', () => { if (isConnected()) syncNow(); });
       window.addEventListener('online', () => { if (isConnected()) syncNow(); });
     },
-    async connectNow() {
+    async signIn() {
       try {
         await connect();
-        await syncNow();
+        return true;
       } catch (e) {
-        onStatus(linked() ? 'reconnect' : 'local');
         notify('could not connect to Google');
+        return false;
       }
+    },
+    async connectNow() {
+      if (await this.signIn()) await syncNow();
+      else onStatus(linked() ? 'reconnect' : 'local');
     },
     changed() {
       setDirty(true);
@@ -249,5 +300,7 @@ export function createSync({ getData, applyData, onStatus, ask, notify }) {
       onStatus('local');
     },
     sheetId: () => sheet,
+    linked,
+    hasUnsynced: () => readLS(DIRTY_KEY) === '1',
   };
 }

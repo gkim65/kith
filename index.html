@@ -4,17 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Kith</title>
-<script>
-  // Set the theme before first paint so the page does not flash the wrong colours.
-  (function () {
-    let t = null;
-    try { t = localStorage.getItem('kith_theme'); } catch (e) {}
-    if (t !== 'light' && t !== 'dark') {
-      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    }
-    document.documentElement.dataset.theme = t;
-  })();
-</script>
+<!-- Only these sources may run code, load styles or fonts, or be contacted from this page. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';
+  script-src 'self' https://cdnjs.cloudflare.com https://accounts.google.com/gsi/client;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style;
+  font-src https://fonts.gstatic.com;
+  connect-src 'self' https://www.googleapis.com https://sheets.googleapis.com https://oauth2.googleapis.com https://accounts.google.com/gsi/;
+  frame-src https://accounts.google.com/gsi/;
+  img-src 'self' data:;
+  object-src 'none'; base-uri 'self'; form-action 'self'" />
+<script src="js/boot.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
@@ -31,11 +30,12 @@
     <span class="sync-wrap">
       <button class="btn btn-ghost sync-btn" id="sync-status" data-status="local"><span class="sync-dot"></span><span class="sync-label">connect Google Sheets</span></button>
       <div class="sync-menu" id="sync-menu" hidden>
-        <a id="open-sheet" href="#" target="_blank" rel="noopener">open your sheet</a>
         <button id="sync-now">sync now</button>
         <button id="sync-off">disconnect</button>
+        <button id="sync-erase">disconnect and erase this browser's copy</button>
       </div>
     </span>
+    <a class="btn btn-ghost" id="sheet-link" href="#" target="_blank" rel="noopener" hidden>open sheet</a>
     <button class="btn btn-ghost" id="about-open">about</button>
     <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle light and dark theme"></button>
   </div>
@@ -79,8 +79,7 @@
       <svg id="sky" role="img" aria-label="Constellation of people"></svg>
       <div class="empty-sky" id="empty-sky" hidden>
         <p>Your sky is empty.</p>
-        <p class="muted">Add the people you know with <strong>+ person</strong>.</p>
-        <button class="btn btn-ghost" id="load-sample">try it with sample people</button>
+        <p class="muted">Add the people you know with <strong>+ person</strong>, or <strong>+ log a chat</strong>.</p>
       </div>
     </div>
     <aside id="panel" class="panel">
@@ -96,6 +95,19 @@
 </div>
 
 <footer class="legend" id="legend"></footer>
+
+<div class="welcome" id="welcome" hidden>
+  <div class="welcome-card">
+    <h1 class="welcome-title">Kith</h1>
+    <p class="tagline">the friends in our orbit</p>
+    <p>A small sky of the people you know. The closer they sit to you, the more recently you
+      talked; when someone starts drifting, Kith nudges you to reach out.</p>
+    <button class="btn btn-primary welcome-signin">sign in with Google</button>
+    <button class="mini welcome-offline" hidden>continue without syncing</button>
+    <p class="fine">Your people are kept in a Google Sheet in your own Drive, and in this browser.
+      Kith has no server and never sees them.</p>
+  </div>
+</div>
 
 <dialog class="about name-dialog" id="name-dialog" aria-labelledby="name-title">
   <form method="dialog">
@@ -123,7 +135,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"
+  integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
