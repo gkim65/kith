@@ -53,18 +53,22 @@ const splitList = (text) => String(text ?? '').split(',').map((x) => x.trim()).f
 export async function ensureSheet() {
   let id = null;
   try { id = localStorage.getItem(SHEET_KEY); } catch (e) {}
+  let usable = false;
   if (id) {
     try {
       const f = await gfetch(`${DRIVE}/${encodeURIComponent(id)}?fields=id,trashed`);
-      if (f && !f.trashed) return id;
+      usable = !!f && !f.trashed;
     } catch (e) {
       if (e.status !== 404 && e.status !== 403) throw e;
     }
   }
-  const q = encodeURIComponent("appProperties has { key='kith' and value='1' } and trashed=false");
-  const found = await gfetch(`${DRIVE}?q=${q}&orderBy=modifiedTime desc&fields=files(id)&pageSize=10`);
-  id = found.files && found.files.length ? found.files[0].id : await createSheet();
-  try { localStorage.setItem(SHEET_KEY, id); } catch (e) {}
+  if (!usable) {
+    const q = encodeURIComponent("appProperties has { key='kith' and value='1' } and trashed=false");
+    const found = await gfetch(`${DRIVE}?q=${q}&orderBy=modifiedTime desc&fields=files(id)&pageSize=10`);
+    id = found.files && found.files.length ? found.files[0].id : await createSheet();
+    try { localStorage.setItem(SHEET_KEY, id); } catch (e) {}
+  }
+  // However the sheet was found, make sure its tabs exist before anything reads them.
   await ensureTabs(id);
   return id;
 }
@@ -147,7 +151,8 @@ export function rememberedSheetId() {
  * extra columns; and `needsWrite`, true when rows typed in by hand were given ids or repaired.
  */
 export async function readSheet(id) {
-  const ranges = TABS.map((t) => `ranges=${encodeURIComponent(`${t}!A1:ZZ`)}`).join('&');
+  // A bare tab name means every cell on that tab; a range past the grid's edge would be refused.
+  const ranges = TABS.map((t) => `ranges=${encodeURIComponent(t)}`).join('&');
   const reply = await gfetch(`${SHEETS}/${id}/values:batchGet?${ranges}&valueRenderOption=FORMATTED_VALUE`);
   const layout = {};
   let needsWrite = false;
