@@ -37,3 +37,16 @@ export function driftRatio(person, today = new Date()) {
   const cadence = person.cadenceDays || DEFAULT_CADENCE_DAYS;
   return daysSince(person.lastChat, today) / cadence;
 }
+
+/**
+ * tagList(people) -> string[]
+ *
+ * Every tag used by anyone, sorted alphabetically (the order fixes each tag's colour).
+ *
+ *   - `people` — person objects with a `tags` array
+ *
+ * Returns unique tag names.
+ */
+export function tagList(people) {
+  return [...new Set(people.flatMap((p) => p.tags))].sort((a, b) => a.localeCompare(b));
+}

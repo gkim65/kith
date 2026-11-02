@@ -55,6 +55,7 @@ export function makeSample(today = new Date()) {
     const last = new Date(today.getTime() - days * 86400000);
     const tags = [circle.tag];
     if (rand() < 0.25) tags.push(pick(CIRCLES).tag);
+    if (circle.tag === 'conference') tags.push(rand() < 0.5 ? 'AAS 2026' : 'IAC 2026');
     return {
       id: `p${i}`,
       name: `${first} ${pick(LAST)}`,

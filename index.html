@@ -5,18 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Kith</title>
 <script>
-  // Set the theme before first paint so the page does not flash the wrong colours.
+  // Set theme and font before first paint so the page does not flash the wrong look.
   (function () {
-    let t = null;
-    try { t = localStorage.getItem('kith_theme'); } catch (e) {}
+    const root = document.documentElement;
+    let t = null, f = null;
+    try { t = localStorage.getItem('kith_theme'); f = localStorage.getItem('kith_font'); } catch (e) {}
     if (t !== 'light' && t !== 'dark') {
       t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
-    document.documentElement.dataset.theme = t;
+    root.dataset.theme = t;
+    root.dataset.font = ['journal', 'handwritten', 'bookish'].includes(f) ? f : 'journal';
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -26,15 +28,23 @@
     <span class="tagline">the friends in our orbit</span>
   </div>
   <div class="actions">
-    <input class="search" type="search" placeholder="search people, tags, notes…" disabled title="Search arrives in milestone 4" />
+    <input class="search" type="search" placeholder="find someone…" disabled title="Search arrives in milestone 4" />
     <button class="btn" disabled title="Logging chats arrives in milestone 3">+ log a chat</button>
+    <!-- Temporary: for comparing font styles before we pick one. -->
+    <select class="btn btn-ghost" id="font-pick" aria-label="Font style">
+      <option value="journal">soft journal</option>
+      <option value="handwritten">handwritten</option>
+      <option value="bookish">bookish</option>
+    </select>
     <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle light and dark theme"></button>
   </div>
 </header>
 
+<nav class="tagbar" id="tagbar" aria-label="Tags"></nav>
+
 <main class="stage">
   <div class="sky-wrap"><svg id="sky" role="img" aria-label="Constellation of people"></svg></div>
-  <aside id="panel" class="panel" hidden></aside>
+  <aside id="panel" class="panel"><div class="panel-inner"></div></aside>
 </main>
 
 <footer class="legend" id="legend"></footer>
