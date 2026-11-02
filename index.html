@@ -4,6 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Kith</title>
+<meta name="description" content="The friends in our orbit: keep track of the people you know and who to reach out to." />
+<meta name="theme-color" content="#0b1020" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="apple-mobile-web-app-title" content="Kith" />
 <!-- Only these sources may run code, load styles or fonts, or be contacted from this page. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self';
   script-src 'self' https://cdnjs.cloudflare.com https://accounts.google.com/gsi/client;
@@ -25,7 +32,7 @@
     <span class="tagline">the friends in our orbit</span>
   </div>
   <div class="actions">
-    <button class="btn" id="log-chat">+ log a chat</button>
+    <button class="btn" id="log-chat">+ <span class="wide-only">log a </span>chat</button>
     <button class="btn" id="add-person">+ person</button>
     <span class="sync-wrap">
       <button class="btn btn-ghost sync-btn" id="sync-status" data-status="local"><span class="sync-dot"></span><span class="sync-label">connect Google Sheets</span></button>
@@ -52,6 +59,10 @@
   <p>Every star is someone you know. The closer they sit to you, the more recently you talked. When
     it has been longer than you meant, they drift outward and fade, and they show up in
     "reach out today" as a nudge.</p>
+  <p><strong>Your privacy.</strong> Your people are kept in only two places: a Google Sheet in your own
+    Google Drive, and this browser. Kith has no server and no analytics, and nobody else, including
+    me, can see your data. Kith can only open the one sheet it created, not anything else in your Drive,
+    and it never shares that sheet.</p>
   <p>Made by Grace, with help from Claude. I hope it helps you keep your people close. If you have
     suggestions, or would like to use Kith yourself, get in touch through
     <a href="https://gkim65.github.io" target="_blank" rel="noopener">my website</a>.</p>

@@ -212,11 +212,13 @@ export function renderConstellation(svgEl, people, links, tags, {
   me.tx = cx;
   me.ty = cy;
 
-  // Names sit beside each star on the side facing away from you; yours sits above.
-  labelSel
-    .attr('text-anchor', (d) => (d.isMe ? 'middle' : d.tx >= cx ? 'start' : 'end'))
-    .attr('dx', (d) => (d.isMe ? 0 : d.tx >= cx ? 9 : -9))
-    .attr('dy', (d) => (d.isMe ? -13 : 4));
+  // Names sit beside each star on the side facing away from you (flipped by declutter when that
+  // side is blocked); yours sits above.
+  const outward = (d) => d.tx >= cx;
+  const placeLabel = (sel, flip) => sel
+    .attr('text-anchor', (d) => (d.isMe ? 'middle' : outward(d) !== flip ? 'start' : 'end'))
+    .attr('dx', (d) => (d.isMe ? 0 : outward(d) !== flip ? 9 : -9));
+  placeLabel(labelSel, false).attr('dy', (d) => (d.isMe ? -13 : 4));
 
   // Labels keep a constant on-screen size, so zooming in makes room to show more names.
   let zoomK = 1;
@@ -226,7 +228,8 @@ export function renderConstellation(svgEl, people, links, tags, {
   /**
    * declutter()
    *
-   * Hide any visible name that would overlap a higher-priority one (it still shows on hover).
+   * Keep visible names from covering each other or other stars. Each name tries its usual side,
+   * then the other side; if both are blocked it hides until hovered. Your own name always shows.
    * Priority: you, the selected person, their neighbours, lit tag or search matches, everyone else.
    */
   function declutter() {
@@ -235,19 +238,35 @@ export function renderConstellation(svgEl, people, links, tags, {
     const zoomed = svgEl.classList.contains('zoomed');
     const rank = (g) => (g.classList.contains('me') ? 0 : g.classList.contains('selected') ? 1
       : g.classList.contains('neighbour') ? 2 : g.classList.contains('tagged') ? 3 : zoomed ? 4 : null);
+    const overlap = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+    const visible = nodeSel.nodes().filter((g) => !g.classList.contains('dim'));
+    const stars = visible.map((g) => {
+      const d = d3.select(g).datum();
+      const r = (d.isMe ? 9 : STAR_R) + 2;
+      return { id: d.id, x0: d.x - r, y0: d.y - r, x1: d.x + r, y1: d.y + r };
+    });
     const kept = [];
     nodeSel.classed('crowded', false);
-    nodeSel.nodes()
+    placeLabel(labelSel, false);
+    visible
       .map((g) => ({ g, r: rank(g) }))
-      .filter((o) => o.r !== null && !o.g.classList.contains('dim'))
+      .filter((o) => o.r !== null)
       .sort((a, b) => a.r - b.r)
       .forEach(({ g }) => {
         const d = d3.select(g).datum();
-        const b = g.querySelector('.label').getBBox();
-        const box = { x0: d.x + b.x, y0: d.y + b.y, x1: d.x + b.x + b.width, y1: d.y + b.y + b.height };
-        const hit = kept.some((k) => box.x0 < k.x1 && box.x1 > k.x0 && box.y0 < k.y1 && box.y1 > k.y0);
-        if (hit) g.classList.add('crowded');
-        else kept.push(box);
+        const label = d3.select(g).select('.label');
+        const boxOf = () => {
+          const b = label.node().getBBox();
+          return { x0: d.x + b.x, y0: d.y + b.y, x1: d.x + b.x + b.width, y1: d.y + b.y + b.height };
+        };
+        const blocked = (box) => kept.some((k) => overlap(box, k)) || stars.some((st) => st.id !== d.id && overlap(box, st));
+        let box = boxOf();
+        if (!d.isMe && blocked(box)) {
+          placeLabel(label, true);
+          box = boxOf();
+          if (blocked(box)) { placeLabel(label, false); g.classList.add('crowded'); return; }
+        }
+        kept.push(box);
       });
   }
 

@@ -121,6 +121,7 @@ function pick(id) {
     { onPick: pick, onTag: setTag, onCadence: setCadence, onEdit: edit, onLog: (pid) => logChat(null, [pid]), onEditLog: (lid) => logChat(lid) });
   refresh();
   graph.focus(state.selectedId);
+  panel.classList.remove('tall');
 }
 
 /** Open the editor for a person, or for someone new when `id` is null. */
@@ -133,6 +134,7 @@ function edit(id) {
     onCancel: () => { state.editing = null; pick(id); },
     onDelete: deletePerson,
   });
+  panel.classList.add('tall');
   openPanel(panel);
 }
 
@@ -191,6 +193,7 @@ function logChat(logId, presetIds = []) {
       showToast('chat deleted');
     },
   });
+  panel.classList.add('tall');
   openPanel(panel);
 }
 

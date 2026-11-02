@@ -76,7 +76,7 @@ body {
   border-radius: 999px;
   padding: 7px 14px;
 }
-.btn { cursor: pointer; transition: border-color 0.2s; }
+.btn { cursor: pointer; white-space: nowrap; transition: border-color 0.2s; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-ghost { background: transparent; }
@@ -423,7 +423,8 @@ body {
 }
 .edit-chip button { font: inherit; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0 4px; }
 .edit-chip button:hover { color: var(--text); }
-.tag-editor .tag-input { flex: 1 1 90px; border: none; background: transparent; padding: 3px 4px; }
+/* The typing field inside a chip box takes the box's border, not its own. */
+.tag-editor input { flex: 1 1 90px; border: none; background: transparent; padding: 3px 4px; }
 
 .conn-list li { display: flex; align-items: baseline; gap: 4px; }
 .conn-list .mini { margin-left: auto; }
@@ -493,7 +494,11 @@ body {
 
 /* ── Phone width: sidebar folds into a search box and a scrolling tag row; panel is a bottom sheet ── */
 @media (max-width: 700px) {
-  .topbar { padding: 12px 16px; }
+  .topbar { padding: 12px 16px; gap: 8px; }
+  .actions { width: 100%; flex-wrap: wrap; gap: 6px; }
+  .actions .btn { font-size: 13px; padding: 5px 11px; }
+  .wide-only { display: none; }
+  .panel.tall { height: 88%; }
   .layout { flex-direction: column; }
   .sidebar {
     width: 100%;
