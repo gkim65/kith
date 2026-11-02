@@ -63,6 +63,35 @@ function normalizePerson(p) {
 }
 
 /**
+ * normalizeData(d) -> object
+ *
+ * Coerce a whole sky into the expected shape: people cleaned up, and connections and chats that
+ * point at people who no longer exist dropped (a chat with nobody left in it goes too).
+ *
+ *   - `d` — sky-like object (from storage, the sheet, or a merge)
+ *
+ * Returns the sky in `emptyStore` shape.
+ */
+export function normalizeData(d) {
+  const people = (Array.isArray(d.people) ? d.people : []).filter((p) => p && p.id != null && p.id !== '').map(normalizePerson);
+  const ids = new Set(people.map((p) => p.id));
+  const links = (Array.isArray(d.links) ? d.links : [])
+    .filter((l) => l && ids.has(String(l.source)) && ids.has(String(l.target)) && String(l.source) !== String(l.target))
+    .map((l) => ({ source: String(l.source), target: String(l.target), label: String(l.label ?? '') }));
+  const logs = (Array.isArray(d.logs) ? d.logs : [])
+    .filter((l) => l && /^\d{4}-\d{2}-\d{2}$/.test(l.date ?? ''))
+    .map((l) => ({
+      id: String(l.id ?? newId()),
+      date: l.date,
+      with: (Array.isArray(l.with) ? l.with : []).map(String).filter((id) => ids.has(id)),
+      mentions: (Array.isArray(l.mentions) ? l.mentions : []).map(String).filter((id) => ids.has(id)),
+      note: String(l.note ?? ''),
+    }))
+    .filter((l) => l.with.length > 0);
+  return { version: 1, me: { name: String(d.me?.name ?? '') }, people, links, logs };
+}
+
+/**
  * loadStore() -> object
  *
  * Read the saved sky from this browser.
@@ -79,22 +108,7 @@ export function loadStore() {
   try {
     const d = JSON.parse(raw);
     if (!d || !Array.isArray(d.people) || !Array.isArray(d.links)) throw new Error('bad shape');
-    const people = d.people.filter((p) => p && p.id != null).map(normalizePerson);
-    const ids = new Set(people.map((p) => p.id));
-    const links = d.links
-      .filter((l) => l && ids.has(String(l.source)) && ids.has(String(l.target)))
-      .map((l) => ({ source: String(l.source), target: String(l.target), label: String(l.label ?? '') }));
-    const logs = (Array.isArray(d.logs) ? d.logs : [])
-      .filter((l) => l && /^\d{4}-\d{2}-\d{2}$/.test(l.date ?? ''))
-      .map((l) => ({
-        id: String(l.id ?? newId()),
-        date: l.date,
-        with: (Array.isArray(l.with) ? l.with : []).map(String).filter((id) => ids.has(id)),
-        mentions: (Array.isArray(l.mentions) ? l.mentions : []).map(String).filter((id) => ids.has(id)),
-        note: String(l.note ?? ''),
-      }))
-      .filter((l) => l.with.length > 0);
-    return { version: 1, me: { name: String(d.me?.name ?? '') }, people, links, logs };
+    return normalizeData(d);
   } catch (e) {
     try { localStorage.setItem(`${KEY}_unreadable`, raw); } catch (e2) {}
     return emptyStore();

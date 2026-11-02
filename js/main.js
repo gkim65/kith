@@ -4,11 +4,13 @@ import { makeSample } from './sample.js';
 import { matchesQuery, pickReachOut, tagList, todayISO } from './data.js';
 import { renderConstellation } from './graph.js';
 import { loadStore, newId, saveStore, stubPerson } from './store.js';
+import { createSync } from './sync.js';
+import { sheetUrl } from './sheet.js';
 import { renderEditor } from './editor.js';
 import { logLinks, logText, renderLogForm } from './logs.js';
 import {
-  askName, initAbout, initThemeToggle, openPanel, renderLegend, renderPeopleList, renderReachOut,
-  renderTagList, showPerson, showToast,
+  askName, askYesNo, initAbout, initThemeToggle, openPanel, renderLegend, renderPeopleList, renderReachOut,
+  renderTagList, showPerson, showSyncStatus, showToast,
 } from './ui.js';
 
 const data = loadStore();
@@ -26,6 +28,9 @@ const clearTagsBtn = document.getElementById('clear-tags');
 const reachEl = document.getElementById('reach-list');
 const emptySky = document.getElementById('empty-sky');
 const nameDialog = document.getElementById('name-dialog');
+const askDialog = document.getElementById('ask-dialog');
+const syncBtn = document.getElementById('sync-status');
+const syncMenu = document.getElementById('sync-menu');
 const phone = window.matchMedia('(max-width: 700px)');
 
 // `editing` is set while a form is open (a person id, 'new', or 'log'); clicks elsewhere wait until it closes.
@@ -36,14 +41,41 @@ let graph;
 const reachPicks = () => pickReachOut(data.people, `${todayISO()}|${state.shuffles}`);
 let reach = reachPicks();
 
-/** Save everything and redraw after any change to people, connections, or chats. */
-function commit() {
+/** Save in this browser and redraw. */
+function persist() {
   if (!saveStore(data)) showToast('could not save in this browser; changes will be lost on reload');
   tags = tagList(data.people);
   allLinks = data.links.concat(logLinks(data.logs, data.links));
   reach = reachPicks();
   draw();
 }
+
+/** After any change to people, connections, or chats: save here first, then let sync carry it to the sheet. */
+function commit() {
+  persist();
+  sync.changed();
+}
+
+const sync = createSync({
+  getData: () => data,
+  // A merge from the sheet: take it, save it here, and refresh whatever is open.
+  applyData: (merged) => {
+    data.me = merged.me;
+    data.people = merged.people;
+    data.links = merged.links;
+    data.logs = merged.logs;
+    persist();
+    if (state.selectedId && !data.people.some((p) => p.id === state.selectedId)) {
+      state.selectedId = null;
+      if (!state.editing) panel.classList.remove('open');
+    } else if (state.selectedId && !state.editing) {
+      pick(state.selectedId);
+    }
+  },
+  onStatus: (status) => showSyncStatus(syncBtn, status),
+  ask: (message) => askYesNo(askDialog, message),
+  notify: showToast,
+});
 
 /** Size of the sky hidden behind the open panel, so the camera centres in what is left. */
 function obstruction() {
@@ -237,6 +269,25 @@ function draw() {
 
 draw();
 renderLegend(legend);
+sync.start();
+
+syncBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const status = syncBtn.dataset.status;
+  if (status === 'local' || status === 'reconnect') sync.connectNow();
+  else if (status === 'offline' || status === 'paused') sync.syncNow();
+  else if (status === 'synced') {
+    syncMenu.querySelector('#open-sheet').href = sheetUrl(sync.sheetId());
+    syncMenu.hidden = !syncMenu.hidden;
+  }
+});
+document.addEventListener('click', (e) => { if (!syncMenu.contains(e.target)) syncMenu.hidden = true; });
+document.getElementById('sync-now').addEventListener('click', () => { syncMenu.hidden = true; sync.syncNow(); });
+document.getElementById('sync-off').addEventListener('click', async () => {
+  syncMenu.hidden = true;
+  const ok = await askYesNo(askDialog, 'Disconnect from Google? Your people stay in this browser and in your sheet.', 'disconnect', 'cancel');
+  if (ok) sync.stop();
+});
 initAbout(document.getElementById('about-open'), document.getElementById('about'));
 initThemeToggle(document.getElementById('theme-toggle'), () => { graph.recolor(); renderLegend(legend); refresh(); });
 

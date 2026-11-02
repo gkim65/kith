@@ -350,3 +350,50 @@ export function askName(dialog, current) {
     }, { once: true });
   });
 }
+
+/**
+ * askYesNo(dialog, message, yes, no) -> Promise<boolean>
+ *
+ * Ask a yes/no question in the question dialog.
+ *
+ *   - `dialog`  — the question `<dialog>`
+ *   - `message` — the question, plain text
+ *   - `yes`     — label for the yes button, default 'yes'
+ *   - `no`      — label for the no button, default 'no'
+ *
+ * Resolves to true for yes, false for no or a dismissed dialog.
+ */
+export function askYesNo(dialog, message, yes = 'yes', no = 'no') {
+  dialog.querySelector('.ask-message').textContent = message;
+  dialog.querySelector('button[value="yes"]').textContent = yes;
+  dialog.querySelector('button[value="no"]').textContent = no;
+  dialog.returnValue = '';
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'yes'), { once: true });
+  });
+}
+
+/** What the sync button says for each sync status, and whether clicking it does anything. */
+const SYNC_LABELS = {
+  local: 'connect Google Sheets',
+  reconnect: 'reconnect to sync',
+  syncing: 'syncing…',
+  synced: 'synced',
+  offline: 'offline · saved here',
+  paused: 'sync paused',
+};
+
+/**
+ * showSyncStatus(button, status)
+ *
+ * Update the header sync button for a status from `createSync`.
+ *
+ *   - `button` — the sync status `<button>`
+ *   - `status` — 'local', 'reconnect', 'syncing', 'synced', 'offline' or 'paused'
+ */
+export function showSyncStatus(button, status) {
+  button.dataset.status = status;
+  button.querySelector('.sync-label').textContent = SYNC_LABELS[status] || status;
+  button.title = status === 'synced' ? `synced at ${new Date().toLocaleTimeString()}` : '';
+}

@@ -28,6 +28,14 @@
   <div class="actions">
     <button class="btn" id="log-chat">+ log a chat</button>
     <button class="btn" id="add-person">+ person</button>
+    <span class="sync-wrap">
+      <button class="btn btn-ghost sync-btn" id="sync-status" data-status="local"><span class="sync-dot"></span><span class="sync-label">connect Google Sheets</span></button>
+      <div class="sync-menu" id="sync-menu" hidden>
+        <a id="open-sheet" href="#" target="_blank" rel="noopener">open your sheet</a>
+        <button id="sync-now">sync now</button>
+        <button id="sync-off">disconnect</button>
+      </div>
+    </span>
     <button class="btn btn-ghost" id="about-open">about</button>
     <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle light and dark theme"></button>
   </div>
@@ -98,6 +106,17 @@
       <span class="spacer"></span>
       <button class="btn btn-ghost" value="cancel" formnovalidate>not now</button>
       <button class="btn btn-primary" value="save">save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="about name-dialog" id="ask-dialog" aria-label="Question">
+  <form method="dialog">
+    <p class="ask-message"></p>
+    <div class="editor-actions">
+      <span class="spacer"></span>
+      <button class="btn btn-ghost" value="no">no</button>
+      <button class="btn btn-primary" value="yes">yes</button>
     </div>
   </form>
 </dialog>
