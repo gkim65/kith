@@ -14,9 +14,10 @@ const tagListEl = document.getElementById('tag-list');
 const peopleListEl = document.getElementById('people-list');
 const peopleCount = document.getElementById('people-count');
 const search = document.getElementById('search');
+const clearTagsBtn = document.getElementById('clear-tags');
 const phone = window.matchMedia('(max-width: 700px)');
 
-const state = { selectedId: null, tag: null, query: '' };
+const state = { selectedId: null, litTags: new Set(), query: '' };
 let graph;
 
 /** Size of the sky hidden behind the open panel, so the camera centres in what is left. */
@@ -26,10 +27,12 @@ function obstruction() {
 }
 
 function refresh() {
-  const shown = people.filter((p) => matchesQuery(p, state.query) && (!state.tag || p.tags.includes(state.tag)));
+  const shown = people.filter((p) => matchesQuery(p, state.query)
+    && (state.litTags.size === 0 || p.tags.some((t) => state.litTags.has(t))));
   const matches = state.query.trim() ? new Set(shown.map((p) => p.id)) : null;
-  graph.highlight({ selectedId: state.selectedId, tag: state.tag, matches });
-  renderTagList(tagListEl, people, tags, state.tag, setTag);
+  graph.highlight({ selectedId: state.selectedId, litTags: state.litTags, matches });
+  renderTagList(tagListEl, people, tags, state.litTags, setTag);
+  clearTagsBtn.hidden = state.litTags.size === 0;
   renderPeopleList(peopleListEl, shown, state.selectedId, pick);
   peopleCount.textContent = shown.length === people.length ? people.length : `${shown.length} of ${people.length}`;
 }
@@ -42,16 +45,23 @@ function pick(id) {
   graph.focus(state.selectedId);
 }
 
+/** Toggle one tag on or off; several can be lit at once. */
 function setTag(tag) {
-  state.tag = state.tag === tag ? null : tag;
+  if (state.litTags.has(tag)) state.litTags.delete(tag);
+  else state.litTags.add(tag);
   if (state.selectedId) pick(null);
   else refresh();
 }
 
+function clearTags() {
+  state.litTags.clear();
+  refresh();
+}
+
 function draw() {
   graph = renderConstellation(sky, people, links, tags, {
-    // Clicking empty sky closes the person first, then clears the lit tag.
-    onSelect: (p) => (p || state.selectedId ? pick(p ? p.id : null) : setTag(state.tag)),
+    // Clicking empty sky closes the person first, then clears the lit tags.
+    onSelect: (p) => (p || state.selectedId ? pick(p ? p.id : null) : clearTags()),
     obstruction,
   });
   refresh();
@@ -67,6 +77,8 @@ search.addEventListener('input', () => {
   if (state.selectedId) pick(null);
   else refresh();
 });
+
+clearTagsBtn.addEventListener('click', clearTags);
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') pick(null); });
 

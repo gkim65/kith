@@ -133,8 +133,8 @@ function angularOrder(friends, edges) {
  *   - `onSelect`    — called with a person (or null) when a star or empty sky is clicked
  *   - `obstruction` — returns `{ right, bottom }` (px) of the sky covered by the side panel
  *
- * Returns handles: `highlight({ selectedId, tag, matches })` lights a person and their
- * neighbours, or everyone with a tag and/or in the `matches` id set; `focus(id|null)` glides
+ * Returns handles: `highlight({ selectedId, litTags, matches })` lights a person and their
+ * neighbours, or everyone with any of the lit tags and/or in the `matches` id set; `focus(id|null)` glides
  * the camera to a person or back home; `recolor()` re-reads the theme colours.
  */
 export function renderConstellation(svgEl, people, links, tags, {
@@ -245,7 +245,7 @@ export function renderConstellation(svgEl, people, links, tags, {
     linkSel.attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);
     nodeSel.attr('transform', (d) => `translate(${d.x},${d.y})`);
-    nebula.selectAll('circle').attr('cx', (d) => d.x).attr('cy', (d) => d.y);
+    nebula.selectAll('circle').attr('cx', (n) => n.d.x).attr('cy', (n) => n.d.y);
   };
   const sim = d3.forceSimulation(nodes)
     .force('x', d3.forceX((d) => d.tx).strength(0.3))
@@ -276,11 +276,11 @@ export function renderConstellation(svgEl, people, links, tags, {
   const home = d3.zoomIdentity.translate(cx, cy).scale(homeK).translate(-cx, -cy);
   svg.call(zoom.transform, home);
 
-  function highlight({ selectedId = null, tag = null, matches = null } = {}) {
+  function highlight({ selectedId = null, litTags = new Set(), matches = null } = {}) {
     const near = selectedId ? neighbours.get(selectedId) : null;
-    const inTag = (d) => !!tag && d.tags.includes(tag);
-    const filtering = !!tag || !!matches;
-    const passes = (d) => (!tag || inTag(d)) && (!matches || matches.has(d.id));
+    const inTag = (d) => d.tags.some((t) => litTags.has(t));
+    const filtering = litTags.size > 0 || !!matches;
+    const passes = (d) => (litTags.size === 0 || inTag(d)) && (!matches || matches.has(d.id));
     const lit = (d) => {
       if (d.isMe) return true;
       if (selectedId) return d.id === selectedId || near.has(d.id);
@@ -295,12 +295,13 @@ export function renderConstellation(svgEl, people, links, tags, {
       return filtering && !(passes(d.source) && passes(d.target));
     });
 
-    const color = tag ? tagColor(tag, tags) : null;
-    nebula.selectAll('circle').data(friends.filter(inTag), (d) => d.id).join(
-      (enter) => enter.append('circle').attr('cx', (d) => d.x).attr('cy', (d) => d.y)
-        .attr('r', 0).attr('fill', color)
+    // One glow per (person, lit tag), so someone in two lit tags blends both colours.
+    const glows = friends.flatMap((d) => d.tags.filter((t) => litTags.has(t)).map((t) => ({ d, t })));
+    nebula.selectAll('circle').data(glows, (n) => `${n.d.id}|${n.t}`).join(
+      (enter) => enter.append('circle').attr('cx', (n) => n.d.x).attr('cy', (n) => n.d.y)
+        .attr('r', 0).attr('fill', (n) => tagColor(n.t, tags))
         .call((e) => e.transition().duration(GLIDE_MS).attr('r', 36)),
-      (update) => update.attr('fill', color),
+      (update) => update,
       (exit) => exit.transition().duration(GLIDE_MS / 2).attr('r', 0).remove(),
     );
     declutter();

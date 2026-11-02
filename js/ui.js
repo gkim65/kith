@@ -1,6 +1,6 @@
 // Page chrome: theme toggle, legend, sidebar lists, and the person detail panel.
 
-import { daysSince, driftRatio } from './data.js';
+import { DEFAULT_CADENCE_DAYS, daysSince, driftRatio } from './data.js';
 import { recencyColor, tagColor } from './graph.js';
 
 /**
@@ -78,7 +78,7 @@ export function renderLegend(el) {
  *
  *   - `tag`    — tag name
  *   - `tags`   — every tag in use, for the colour
- *   - `active` — whether this tag is the one currently lit
+ *   - `active` — whether this tag is currently lit
  *   - `extra`  — trusted HTML appended inside the button (e.g. a count), default ''
  *
  * Returns an HTML string.
@@ -89,29 +89,30 @@ function tagChip(tag, tags, active, extra = '') {
 }
 
 /**
- * renderTagList(el, people, tags, activeTag, onTag)
+ * renderTagList(el, people, tags, litTags, onTag)
  *
- * List every tag, most-used first; clicking one lights up that group. A vertical list in the
+ * List every tag, most-used first; clicking one toggles that group's light. A vertical list in the
  * desktop sidebar and a scrolling chip row on phones (layout is in style.css).
  *
  *   - `el`        — the tag list container
  *   - `people`    — all people, for the counts
  *   - `tags`      — every tag in use, from `tagList`
- *   - `activeTag` — the lit tag, or null
+ *   - `litTags`   — Set of the tags currently lit
  *   - `onTag`     — called with a tag name when one is clicked
  */
-export function renderTagList(el, people, tags, activeTag, onTag) {
+export function renderTagList(el, people, tags, litTags, onTag) {
   const count = (t) => people.filter((p) => p.tags.includes(t)).length;
   const sorted = [...tags].sort((a, b) => count(b) - count(a) || a.localeCompare(b));
   el.innerHTML = sorted
-    .map((t) => tagChip(t, tags, t === activeTag, `<span class="count">${count(t)}</span>`)).join('');
+    .map((t) => tagChip(t, tags, litTags.has(t), `<span class="count">${count(t)}</span>`)).join('');
   el.querySelectorAll('.tag-chip').forEach((b) => b.addEventListener('click', () => onTag(b.dataset.tag)));
 }
 
 /**
  * renderPeopleList(el, people, selectedId, onPick)
  *
- * Alphabetical list of people with their recency colour and time since the last chat.
+ * List people with their recency colour and time since the last chat: overdue people first,
+ * most days past due at the top, then everyone else alphabetically.
  *
  *   - `el`         — the `<ul>` to fill
  *   - `people`     — the people to show (already filtered by search and tag)
@@ -119,12 +120,16 @@ export function renderTagList(el, people, tags, activeTag, onTag) {
  *   - `onPick`     — called with a person id when a row is clicked
  */
 export function renderPeopleList(el, people, selectedId, onPick) {
-  const sorted = [...people].sort((a, b) => a.name.localeCompare(b.name));
-  el.innerHTML = sorted.map((p) => `
+  const pastDue = (p) => daysSince(p.lastChat) - (p.cadenceDays || DEFAULT_CADENCE_DAYS);
+  const overdue = people.filter((p) => driftRatio(p) > 1).sort((a, b) => pastDue(b) - pastDue(a));
+  const rest = people.filter((p) => driftRatio(p) <= 1).sort((a, b) => a.name.localeCompare(b.name));
+  const row = (p) => `
     <li><button class="person-row${p.id === selectedId ? ' active' : ''}" data-id="${escapeHtml(p.id)}">
       <span class="tag-name"><span class="dot" style="background:${recencyColor(driftRatio(p))}"></span>${escapeHtml(p.name)}</span>
       <span class="count">${agoText(daysSince(p.lastChat))}</span>
-    </button></li>`).join('') || '<li class="empty">no one matches</li>';
+    </button></li>`;
+  const group = (label, list) => (list.length ? `<li class="group-label">${label}</li>${list.map(row).join('')}` : '');
+  el.innerHTML = (group('overdue', overdue) + group('everyone else', rest)) || '<li class="empty">no one matches</li>';
   el.querySelectorAll('.person-row').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
 }
 
