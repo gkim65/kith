@@ -26,7 +26,8 @@
     <span class="tagline">the friends in our orbit</span>
   </div>
   <div class="actions">
-    <button class="btn" disabled title="Logging chats arrives in milestone 3">+ log a chat</button>
+    <button class="btn" disabled title="Logging chats is coming next">+ log a chat</button>
+    <button class="btn" id="add-person">+ person</button>
     <button class="btn btn-ghost" id="about-open">about</button>
     <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle light and dark theme"></button>
   </div>
@@ -66,12 +67,42 @@
   </aside>
 
   <main class="stage">
-    <div class="sky-wrap"><svg id="sky" role="img" aria-label="Constellation of people"></svg></div>
-    <aside id="panel" class="panel"><div class="panel-inner"></div></aside>
+    <div class="sky-wrap">
+      <svg id="sky" role="img" aria-label="Constellation of people"></svg>
+      <div class="empty-sky" id="empty-sky" hidden>
+        <p>Your sky is empty.</p>
+        <p class="muted">Add the people you know with <strong>+ person</strong>.</p>
+        <button class="btn btn-ghost" id="load-sample">try it with sample people</button>
+      </div>
+    </div>
+    <aside id="panel" class="panel">
+      <div class="panel-inner"></div>
+      <button class="edit-btn" title="edit" aria-label="Edit" hidden>
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+          <path d="M4 20h4L19 9l-4-4L4 16v4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          <path d="M13.5 6.5l4 4" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      </button>
+    </aside>
   </main>
 </div>
 
 <footer class="legend" id="legend"></footer>
+
+<dialog class="about name-dialog" id="name-dialog" aria-labelledby="name-title">
+  <form method="dialog">
+    <h2 id="name-title">What should we call you?</h2>
+    <p>Your first name sits at the center of your sky. Click it any time to change it.</p>
+    <input name="first" maxlength="40" autocomplete="given-name" placeholder="first name" required />
+    <div class="editor-actions">
+      <span class="spacer"></span>
+      <button class="btn btn-ghost" value="cancel" formnovalidate>not now</button>
+      <button class="btn btn-primary" value="save">save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script type="module" src="js/main.js"></script>

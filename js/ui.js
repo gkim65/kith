@@ -182,7 +182,7 @@ export function renderReachOut(el, picks, selectedId, onPick) {
 
 
 /**
- * showPerson(panel, person, people, links, tags, { onPick, onTag, onCadence })
+ * showPerson(panel, person, people, links, tags, { onPick, onTag, onCadence, onEdit })
  *
  * Slide the side panel open with one person's details, or slide it closed when `person` is null.
  *
@@ -194,8 +194,9 @@ export function renderReachOut(el, picks, selectedId, onPick) {
  *   - `onPick` — called with a person id (or null to close) when a connection's name is clicked
  *   - `onTag`  — called with a tag name when one of their tags is clicked
  *   - `onCadence` — called with (person id, days) when their check-in cadence is changed
+ *   - `onEdit` — called with the person id when the pencil button is clicked
  */
-export function showPerson(panel, person, people, links, tags, { onPick, onTag, onCadence }) {
+export function showPerson(panel, person, people, links, tags, { onPick, onTag, onCadence, onEdit }) {
   if (!person) { panel.classList.remove('open'); return; }
   const byId = new Map(people.map((p) => [p.id, p]));
   const conns = links
@@ -214,28 +215,26 @@ export function showPerson(panel, person, people, links, tags, { onPick, onTag, 
       </select></div>
     <div class="hint" hidden>use a whole number, from 1 day up to 2 years</div>
     <div class="chips">${person.tags.map((t) => tagChip(t, tags, false)).join('')}</div>
-    <h3>How you know them</h3>
-    <p>${escapeHtml(person.howMet)}</p>
-    <h3>Notes</h3>
-    <p>${escapeHtml(person.notes)}</p>
+    ${person.howMet ? `<h3>How you know them</h3><p>${escapeHtml(person.howMet)}</p>` : ''}
+    ${person.notes ? `<h3>Notes</h3><p class="notes">${escapeHtml(person.notes)}</p>` : ''}
     <h3>Connected to</h3>
     <ul>${conns.map((c) => `<li><button class="linkish" data-id="${escapeHtml(c.other.id)}">${escapeHtml(c.other.name)}</button>
       <span class="rel">· ${escapeHtml(c.label)}</span></li>`).join('') || '<li class="rel">no one yet</li>'}</ul>`;
+  const editBtn = panel.querySelector('.edit-btn');
+  editBtn.hidden = false;
+  editBtn.setAttribute('aria-label', `Edit ${person.name}`);
+  editBtn.onclick = () => onEdit(person.id);
   inner.querySelector('.close').addEventListener('click', () => onPick(null));
   inner.querySelectorAll('.linkish').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
   inner.querySelectorAll('.tag-chip').forEach((b) => b.addEventListener('click', () => onTag(b.dataset.tag)));
   wireCadence(inner, person, onCadence);
 
-  if (panel.classList.contains('open')) {
-    inner.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
-      { duration: 280, easing: 'ease-out' });
-  }
-  panel.classList.add('open');
+  openPanel(panel);
 }
 
 
 /** Longest allowed check-in cadence (days). */
-const MAX_CADENCE_DAYS = 730;
+export const MAX_CADENCE_DAYS = 730;
 
 /**
  * splitCadence(days) -> [number, number]
@@ -246,7 +245,7 @@ const MAX_CADENCE_DAYS = 730;
  *
  * Returns [count, unit length in days].
  */
-function splitCadence(days) {
+export function splitCadence(days) {
   if (days % 30 === 0) return [days / 30, 30];
   if (days % 7 === 0) return [days / 7, 7];
   return [days, 1];
@@ -300,4 +299,57 @@ export function initAbout(openBtn, dialog) {
   openBtn.addEventListener('click', () => dialog.showModal());
   dialog.querySelector('.close').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+}
+
+/**
+ * openPanel(panel)
+ *
+ * Slide the side panel open, fading its content in when it was already open.
+ *
+ *   - `panel` — the `<aside>` element
+ */
+export function openPanel(panel) {
+  if (panel.classList.contains('open')) {
+    panel.querySelector('.panel-inner').animate(
+      [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+      { duration: 280, easing: 'ease-out' });
+  }
+  panel.classList.add('open');
+}
+
+/**
+ * showToast(message)
+ *
+ * Show a short message at the bottom of the screen for a few seconds.
+ *
+ *   - `message` — plain text to show
+ */
+export function showToast(message) {
+  const el = document.getElementById('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+/**
+ * askName(dialog, current) -> Promise<string|null>
+ *
+ * Ask for your first name in the name dialog.
+ *
+ *   - `dialog`  — the name `<dialog>`
+ *   - `current` — the name to prefill, or ''
+ *
+ * Resolves to the trimmed name, or null if the dialog was dismissed.
+ */
+export function askName(dialog, current) {
+  const input = dialog.querySelector('input');
+  input.value = current;
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener('close', () => {
+      const name = input.value.trim();
+      resolve(dialog.returnValue === 'save' && name ? name : null);
+    }, { once: true });
+  });
 }

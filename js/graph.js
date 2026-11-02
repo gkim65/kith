@@ -122,7 +122,7 @@ function angularOrder(friends, edges) {
 }
 
 /**
- * renderConstellation(svgEl, people, links, tags, { onSelect, obstruction }) -> { highlight, focus, recolor }
+ * renderConstellation(svgEl, people, links, tags, { meName, onSelect, onMe, obstruction }) -> { highlight, focus, recolor }
  *
  * Draw the orbit constellation into an SVG and keep it live.
  *
@@ -130,7 +130,9 @@ function angularOrder(friends, edges) {
  *   - `people`      — person objects with `id`, `name`, `tags`, `lastChat`, `cadenceDays`
  *   - `links`       — `{ source, target, label }` with person ids
  *   - `tags`        — every tag in use, from `tagList` (fixes nebula colours)
+ *   - `meName`      — label for the center star (your first name), default 'you'
  *   - `onSelect`    — called with a person (or null) when a star or empty sky is clicked
+ *   - `onMe`        — called when the center star is clicked
  *   - `obstruction` — returns `{ right, bottom }` (px) of the sky covered by the side panel
  *
  * Returns handles: `highlight({ selectedId, litTags, matches })` lights a person and their
@@ -138,7 +140,9 @@ function angularOrder(friends, edges) {
  * the camera to a person or back home; `recolor()` re-reads the theme colours.
  */
 export function renderConstellation(svgEl, people, links, tags, {
+  meName = 'you',
   onSelect = () => {},
+  onMe = () => {},
   obstruction = () => ({ right: 0, bottom: 0 }),
 } = {}) {
   const svg = d3.select(svgEl);
@@ -149,7 +153,7 @@ export function renderConstellation(svgEl, people, links, tags, {
   const sky = Math.max(140, Math.min(width, height) / 2 - 30);
   const rand = d3.randomLcg(3);
 
-  const me = { id: 'me', name: 'you', isMe: true, tags: [], x: cx, y: cy, fx: cx, fy: cy };
+  const me = { id: 'me', name: meName || 'you', isMe: true, tags: [], x: cx, y: cy, fx: cx, fy: cy };
   const friends = people.map((p) => ({ ...p, ratio: driftRatio(p) }));
   const nodes = [me, ...friends];
   const byId = new Map(friends.map((f) => [f.id, f]));
@@ -318,7 +322,11 @@ export function renderConstellation(svgEl, people, links, tags, {
     svg.transition().duration(GLIDE_MS).ease(d3.easeCubicInOut).call(zoom.transform, target);
   }
 
-  nodeSel.on('click', (event, d) => { event.stopPropagation(); onSelect(d.isMe ? null : d); });
+  nodeSel.on('click', (event, d) => {
+    event.stopPropagation();
+    if (d.isMe) onMe();
+    else onSelect(d);
+  });
   svg.on('click', () => onSelect(null));
 
   return { highlight, focus, recolor };
